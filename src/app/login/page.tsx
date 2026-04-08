@@ -18,73 +18,8 @@ export default function LoginPage() {
         name: '', email: '', phone: '', password: '', confirmPassword: '', terms: false, role: 'TENANT'
     });
 
-    const [otpSent, setOtpSent] = useState(false);
-    const [otp, setOtp] = useState(['', '', '', '', '', '']); // 6 digits
-    const [countdown, setCountdown] = useState(0);
-    const [isOtpVerified, setIsOtpVerified] = useState(false);
-    const [isSendingOtp, setIsSendingOtp] = useState(false);
     const [errorMsg, setErrorMsg] = useState('');
 
-    const otpRefs = [
-        useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null),
-        useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null),
-        useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)
-    ];
-
-    useEffect(() => {
-        let timer: NodeJS.Timeout;
-        if (countdown > 0) timer = setTimeout(() => setCountdown(countdown - 1), 1000);
-        return () => clearTimeout(timer);
-    }, [countdown]);
-
-    const handleSendOtp = async (e: React.MouseEvent) => {
-        e.preventDefault();
-        if (!signupData.email || !signupData.email.includes('@')) {
-            setErrorMsg('Please enter a valid email address');
-            return;
-        }
-        setIsSendingOtp(true);
-        setErrorMsg('');
-        try {
-            const res = await fetch('/api/auth/otp', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: signupData.email })
-            });
-            if (!res.ok) {
-                const err = await res.json();
-                throw new Error(err.message || 'Failed to send OTP');
-            }
-            setOtpSent(true);
-            setCountdown(60);
-            setOtp(['', '', '', '', '', '']);
-            setErrorMsg('Verification code sent to your email.');
-        } catch (err: any) {
-            setErrorMsg(err.message);
-        } finally {
-            setIsSendingOtp(false);
-        }
-    };
-
-    const handleVerifyOtp = (e: React.MouseEvent) => {
-        e.preventDefault();
-        const entered = otp.join('');
-        if (entered.length !== 6) { setErrorMsg('Please enter the 6-digit code'); return; }
-        setIsOtpVerified(true);
-        setErrorMsg('');
-    };
-
-    const handleOtpChange = (index: number, value: string) => {
-        if (!/^[0-9]*$/.test(value)) return;
-        const newOtp = [...otp];
-        newOtp[index] = value;
-        setOtp(newOtp);
-        if (value.length === 1 && index < 5) otpRefs[index + 1].current?.focus();
-    };
-
-    const handleOtpKeyDown = (index: number, e: React.KeyboardEvent) => {
-        if (e.key === 'Backspace' && otp[index] === '' && index > 0) otpRefs[index - 1].current?.focus();
-    };
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -102,7 +37,6 @@ export default function LoginPage() {
     const handleSignup = async (e: React.FormEvent) => {
         e.preventDefault();
         setErrorMsg('');
-        if (!isOtpVerified) { setErrorMsg('Please verify your email first.'); return; }
         if (!signupData.terms) { setErrorMsg('Please agree to the Terms of Service.'); return; }
         if (signupData.password !== signupData.confirmPassword) { setErrorMsg('Passwords do not match.'); return; }
         try {
@@ -113,8 +47,7 @@ export default function LoginPage() {
                     email: signupData.email, 
                     phone: signupData.phone, 
                     password: signupData.password, 
-                    role: signupData.role,
-                    otpCode: otp.join('')
+                    role: signupData.role
                 })
             });
             if (!res.ok) { const err = await res.json(); setErrorMsg(`Signup failed: ${err.message}`); return; }
@@ -275,18 +208,9 @@ export default function LoginPage() {
                             </div>
                             <div>
                                 <label className={labelCls}>Email Address</label>
-                                <div className="flex gap-2">
-                                    <div className="relative flex-1">
-                                        <i className="fas fa-envelope absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300 text-sm" />
-                                        <input type="email" className={inputCls} placeholder="rohan@company.com" value={signupData.email} onChange={e => setSignupData({ ...signupData, email: e.target.value })} disabled={isOtpVerified} required />
-                                    </div>
-                                    {!isOtpVerified && (
-                                        <button type="button" className="flex-shrink-0 px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-xs rounded-xl border border-rose-200 transition-colors disabled:opacity-50 flex items-center gap-2" onClick={handleSendOtp} disabled={countdown > 0 || isSendingOtp}>
-                                            {isSendingOtp && <i className="fas fa-spinner fa-spin" />}
-                                            {countdown > 0 ? `${countdown}s` : 'Send OTP'}
-                                        </button>
-                                    )}
-                                    {isOtpVerified && <span className="flex items-center px-3.5 text-emerald-600 font-bold text-sm"><i className="fas fa-check-circle" /> verified</span>}
+                                <div className="relative">
+                                    <i className="fas fa-envelope absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300 text-sm" />
+                                    <input type="email" className={inputCls} placeholder="rohan@company.com" value={signupData.email} onChange={e => setSignupData({ ...signupData, email: e.target.value })} required />
                                 </div>
                             </div>
                             <div>
@@ -297,29 +221,6 @@ export default function LoginPage() {
                                 </div>
                             </div>
 
-                            {/* OTP */}
-                            {otpSent && !isOtpVerified && (
-                                <div className="bg-rose-50 border border-rose-100 rounded-2xl p-4">
-                                    <p className="text-xs font-bold text-slate-600 mb-3 text-center">Enter Verification Code</p>
-                                    <div className="flex gap-2 justify-center mb-3">
-                                        {otp.map((digit, i) => (
-                                            <input
-                                                key={i} type="text" maxLength={1} value={digit}
-                                                className="w-10 h-12 text-center text-lg font-black border-2 border-slate-200 rounded-xl bg-white outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-100 transition-all font-mono"
-                                                onChange={e => handleOtpChange(i, e.target.value)}
-                                                onKeyDown={e => handleOtpKeyDown(i, e)}
-                                                ref={otpRefs[i]}
-                                            />
-                                        ))}
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <button type="button" className={`text-xs font-semibold ${countdown > 0 ? 'text-slate-300' : 'text-rose-600 hover:underline'}`} disabled={countdown > 0} onClick={countdown === 0 ? handleSendOtp as any : undefined}>
-                                            Resend OTP {countdown > 0 && `(${countdown}s)`}
-                                        </button>
-                                        <button type="button" className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition-colors" onClick={handleVerifyOtp}>Verify</button>
-                                    </div>
-                                </div>
-                            )}
 
                             <div>
                                 <label className={labelCls}>Password</label>
@@ -346,7 +247,7 @@ export default function LoginPage() {
                                     <a href="#" className="text-rose-600 font-semibold hover:underline">Privacy Policy</a>
                                 </span>
                             </label>
-                            <button type="submit" disabled={!isOtpVerified} className="w-full py-3.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm rounded-xl transition-colors flex items-center justify-center gap-2 shadow-[0_4px_16px_rgba(225,29,72,0.25)]">
+                            <button type="submit" className="w-full py-3.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm rounded-xl transition-colors flex items-center justify-center gap-2 shadow-[0_4px_16px_rgba(225,29,72,0.25)]">
                                 <i className="fas fa-user-plus" /> Create Account
                             </button>
                             <p className="text-center text-xs text-slate-400">

@@ -4,32 +4,16 @@ import prisma from "@/lib/prisma";
 
 export async function POST(req: Request) {
   try {
-    const { name, email, phone, password, role, otpCode } = await req.json();
+    const { name, email, phone, password, role } = await req.json();
 
-    if (!name || !email || !password || !otpCode) {
+    if (!name || !email || !password) {
       return NextResponse.json({ message: "Missing required fields" }, { status: 400 });
-    }
-
-    // Verify OTP
-    const otpRecord = await prisma.otp.findFirst({
-      where: { email, code: otpCode }
-    });
-
-    if (!otpRecord) {
-      return NextResponse.json({ message: "Invalid or missing OTP code" }, { status: 400 });
-    }
-
-    if (new Date() > otpRecord.expiresAt) {
-      return NextResponse.json({ message: "OTP has expired" }, { status: 400 });
     }
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
       return NextResponse.json({ message: "Email already exists" }, { status: 400 });
     }
-
-    // Cleanup OTP after successful verification
-    await prisma.otp.deleteMany({ where: { email } });
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
