@@ -1,16 +1,23 @@
 import Mailjet from 'node-mailjet';
 
-const mailjet = new Mailjet({
-    apiKey: process.env.MAILJET_API_KEY || '',
-    apiSecret: process.env.MAILJET_SECRET_KEY || ''
-});
+let mailjetInstance: any = null;
+
+function getMailjet() {
+    if (!mailjetInstance) {
+        mailjetInstance = new Mailjet({
+            apiKey: process.env.MAILJET_API_KEY || 'N/A',
+            apiSecret: process.env.MAILJET_SECRET_KEY || 'N/A'
+        });
+    }
+    return mailjetInstance;
+}
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 const FROM_EMAIL = process.env.MAIL_FROM || 'no-reply@roomefy.com';
 
 export async function sendEmail({ to, subject, html, text }: { to: string, subject: string, html: string, text?: string }) {
     try {
-        const result = await mailjet
+        const result = await getMailjet()
             .post('send', { version: 'v3.1' })
             .request({
                 Messages: [
