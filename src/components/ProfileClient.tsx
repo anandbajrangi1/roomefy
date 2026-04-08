@@ -19,6 +19,22 @@ const METRIC_COLORS = {
     emerald:{ bg: 'bg-emerald-50', icon: 'text-emerald-600' },
     amber:  { bg: 'bg-amber-50',  icon: 'text-amber-600'  },
     sky:    { bg: 'bg-sky-50',    icon: 'text-sky-600'    },
+} as const;
+
+/* ── Reusable metric card ─────────────────────── */
+const MetricCard = ({ icon, value, label, color }: { icon: string; value: string | number; label: string; color: keyof typeof METRIC_COLORS }) => {
+    const c = METRIC_COLORS[color];
+    return (
+        <div className="bg-white rounded-2xl p-5 shadow-[0_4px_12px_rgba(0,0,0,0.04)] border border-slate-50 flex items-center gap-4">
+            <div className={`w-12 h-12 flex-shrink-0 rounded-xl flex items-center justify-center ${c.bg}`}>
+                <i className={`fas ${icon} text-lg ${c.icon}`} aria-hidden="true" />
+            </div>
+            <div>
+                <p className="text-2xl font-black text-slate-900 leading-none">{value}</p>
+                <p className="text-xs text-slate-400 font-semibold mt-1">{label}</p>
+            </div>
+        </div>
+    );
 };
 
 export default function ProfileClient({
@@ -41,21 +57,6 @@ export default function ProfileClient({
     const statusIcon  = vs === 'VERIFIED' ? 'fa-check-circle' : vs === 'REJECTED' ? 'fa-times-circle' : 'fa-clock';
     const metricStatusColor = vs === 'VERIFIED' ? 'emerald' : vs === 'REJECTED' ? 'rose' : 'amber';
 
-    /* ── Reusable metric card ─────────────────────── */
-    const MetricCard = ({ icon, value, label, color }: { icon: string; value: string | number; label: string; color: keyof typeof METRIC_COLORS }) => {
-        const c = METRIC_COLORS[color];
-        return (
-            <div className="bg-white rounded-2xl p-5 shadow-[0_4px_12px_rgba(0,0,0,0.04)] border border-slate-50 flex items-center gap-4">
-                <div className={`w-12 h-12 flex-shrink-0 rounded-xl flex items-center justify-center ${c.bg}`}>
-                    <i className={`fas ${icon} text-lg ${c.icon}`} aria-hidden="true" />
-                </div>
-                <div>
-                    <p className="text-2xl font-black text-slate-900 leading-none">{value}</p>
-                    <p className="text-xs text-slate-400 font-semibold mt-1">{label}</p>
-                </div>
-            </div>
-        );
-    };
 
     return (
         <AppLayout>

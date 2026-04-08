@@ -1,6 +1,8 @@
 import prisma from "@/lib/prisma";
 import HomeClient from "@/components/HomeClient";
 
+export const dynamic = 'force-dynamic';
+
 export default async function Home() {
     // Fetch rooms and their properties from SQLite via Prisma
     const rooms = await prisma.room.findMany({

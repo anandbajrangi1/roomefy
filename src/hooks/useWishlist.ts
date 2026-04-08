@@ -20,12 +20,11 @@ interface UseWishlistReturn {
  */
 export function useWishlist(): UseWishlistReturn {
     const [wishlist, setWishlist] = useState<Set<string>>(new Set());
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         let cancelled = false;
-        setLoading(true);
         getWishlist()
             .then((ids) => {
                 if (!cancelled) setWishlist(new Set(ids));
