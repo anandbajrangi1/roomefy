@@ -31,7 +31,7 @@ export async function getTenantActiveLease() {
     });
 }
 
-export async function submitMaintenanceRequest(data: { title: string, description: string, category: string, priority: string }) {
+export async function submitMaintenanceRequest(data: { title: string, description: string, category: string, priority: string, attachmentUrl?: string }) {
     const session = await getTenantSession();
     
     // Find active booking to get propertyId
