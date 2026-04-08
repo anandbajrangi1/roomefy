@@ -1,26 +1,96 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ============================================================
+   Roomefy Design Tokens — Tailwind CSS v4 @theme
+   ============================================================ */
+@theme {
+    /* Brand colors */
+    --color-primary:      hsl(355 78% 54%);
+    --color-primary-dark: hsl(355 78% 45%);
+    --color-primary-soft: hsla(355, 78%, 54%, 0.1);
+
+    /* Neutrals */
+    --color-dark:       #1A1A1A;
+    --color-light:      #FFFFFF;
+    --color-gray:       #64748B;
+    --color-light-gray: #F8FAFC;
+    --color-border:     #E2E8F0;
+
+    /* Shadows */
+    --shadow-sm: 0 4px 12px rgba(0,0,0,0.03);
+    --shadow-md: 0 10px 30px rgba(0,0,0,0.06);
+    --shadow-lg: 0 20px 60px rgba(0,0,0,0.08);
+
+    /* Border-radius */
+    --radius-sm: 12px;
+    --radius-md: 20px;
+    --radius-lg: 30px;
+
+    /* Fonts */
+    --font-sans: 'Poppins', sans-serif;
+
+    /* Z-index */
+    --z-header:  1000;
+    --z-modal:   1300;
+    --z-sidebar: 1200;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* ============================================================
+   Base — minimal resets not covered by Tailwind Preflight
+   ============================================================ */
+*, *::before, *::after {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-tap-highlight-color: transparent;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+html { font-family: 'Poppins', sans-serif; }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+    overflow-x: hidden;
+    padding-bottom: calc(70px + env(safe-area-inset-bottom));
+}
+
+/* ============================================================
+   Keyframe Animations (used via Tailwind animate-* classes)
+   ============================================================ */
+@keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideUp {
+    from { transform: translateY(100%); opacity: 0.6; }
+    to   { transform: translateY(0);    opacity: 1; }
+}
+@keyframes popIn {
+    0%   { transform: scale(0.5); opacity: 0; }
+    70%  { transform: scale(1.1); }
+    100% { transform: scale(1);   opacity: 1; }
+}
+@keyframes shimmer {
+    0%   { background-position: -200% 0; }
+    100% { background-position:  200% 0; }
+}
+
+/* Expose as utilities */
+@layer utilities {
+    .animate-fade-up   { animation: fadeUp  0.6s ease forwards; }
+    .animate-slide-up  { animation: slideUp 0.35s cubic-bezier(0.22,1,0.36,1); }
+    .animate-pop-in    { animation: popIn   0.5s cubic-bezier(0.22,1,0.36,1); }
+    .animate-shimmer   {
+        background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+        background-size: 200% 100%;
+        animation: shimmer 1.5s infinite;
+    }
+
+    /* App-safe bottom padding for fixed bottom bars */
+    .pb-safe { padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
+
+    /* Text gradient utility */
+    .text-gradient {
+        background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
 }

@@ -1,0 +1,216 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  phone     String?
+  role      String   @default("TENANT") // ADMIN, TENANT, OWNER, BROKER
+  avatarUrl String?
+  verificationStatus String @default("PENDING") // PENDING, VERIFIED, REJECTED
+  kycDocumentUrl    String?
+  memberNote        String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  properties Property[]
+  bookings   Booking[] @relation("TenantBookings")
+  inquiries  Inquiry[]
+  wishlists  Wishlist[]
+  complaints Complaint[] @relation("TenantComplaints")
+  notifications Notification[]
+}
+
+model Property {
+  id       String   @id @default(cuid())
+  title    String
+  city     String
+  area     String
+  address  String
+  ownerId        String
+  status         String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  
+  // Master Lease Economy
+  masterRent     Int?
+  masterDeposit  Int?
+  leaseStartDate String?
+  leaseEndDate   String?
+
+  owner          User     @relation(fields: [ownerId], references: [id])
+  rooms    Room[]
+  inquiries Inquiry[]
+  complaints Complaint[]
+  procurements Procurement[]
+  employees Employee[]
+  expenses Expense[]
+}
+
+model Room {
+  id         String   @id @default(cuid())
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id])
+  type       String   // 1BHK, Single, Shared
+  rent       Int
+  deposit    Int
+  amenities  String   // JSON string or comma separated
+  images       String   // JSON string or comma separated
+  status       String   @default("AVAILABLE") // AVAILABLE, OCCUPIED
+
+  // Advanced Co-Living Architecture
+  bathroomType String   @default("Shared") // Attached, Shared, Common
+  hasBalcony   Boolean  @default(false)
+  roomCategory String   @default("Standard Room") // Master Bedroom, Study Room, Standard Room
+  furnishing   String   @default("Semi-Furnished") // Unfurnished, Semi-Furnished, Fully Furnished
+  capacity     Int      @default(1) // Number of beds in this room
+
+  bookings   Booking[]
+  wishlistedBy Wishlist[]
+}
+
+model Booking {
+  id        String   @id @default(cuid())
+  tenantId  String
+  roomId    String
+  tenant    User     @relation("TenantBookings", fields: [tenantId], references: [id])
+  room      Room     @relation(fields: [roomId], references: [id])
+  startDate DateTime @default(now())
+  endDate   DateTime @default(now())
+  status    String   @default("PENDING") // PENDING, CONFIRMED, CANCELLED, ACTIVE, COMPLETED, SERVED_NOTICE, MOVED_OUT
+
+  // Lease Operational Framework
+  leaseLockInEnd        DateTime?
+  noticeDate            DateTime?
+  policeVerificationUrl String?
+  rentAgreementUrl      String?
+  lockedRentAmount      Int       @default(0)
+  depositHolding        Int       @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt @default(now())
+  payment   Payment?
+}
+
+model Payment {
+  id        String   @id @default(cuid())
+  bookingId String   @unique
+  booking   Booking  @relation(fields: [bookingId], references: [id])
+  tenantId  String
+  amount    Int
+  status    String   @default("PENDING") // PAID, PENDING, OVERDUE, PARTIAL
+  dueDate   String
+}
+
+model Inquiry {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id])
+  roomId     String?
+  name       String?
+  phone      String?
+  status     String   @default("NEW") // NEW, VISITED, BOOKED
+  isSharedWithOwner Boolean @default(false)
+  message    String?
+  createdAt  DateTime @default(now())
+}
+
+model Wishlist {
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+  roomId String
+  room   Room   @relation(fields: [roomId], references: [id])
+
+  @@id([userId, roomId])
+}
+
+model Complaint {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      User     @relation("TenantComplaints", fields: [tenantId], references: [id])
+  propertyId  String
+  property    Property @relation(fields: [propertyId], references: [id])
+  title       String
+  description String
+  category    String   // Plumbing, Electrical, Cleaning, Noise, Others
+  status      String   @default("OPEN") // OPEN, IN_PROGRESS, RESOLVED
+  priority    String   @default("MEDIUM") // LOW, MEDIUM, HIGH
+  attachmentUrl String?
+  adminNote     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Procurement {
+  id           String   @id @default(cuid())
+  propertyId   String
+  property     Property @relation(fields: [propertyId], references: [id])
+  itemName     String
+  category     String   // Furniture, HVAC, Appliance, Electronics, Kitchen, Others
+  quantity     Int      @default(1)
+  unitPrice    Int
+  vendor       String?
+  status       String   @default("ORDERED") // ORDERED, RECEIVED, INSTALLED, RETURNED
+  purchaseDate String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Employee {
+  id           String   @id @default(cuid())
+  propertyId   String?
+  property     Property? @relation(fields: [propertyId], references: [id])
+  name         String
+  role         String   // Manager, Caretaker, Cleaner, Security, Maintenance
+  phone        String
+  email        String?
+  salary       Int?
+  status       String   @default("ACTIVE") // ACTIVE, ON_LEAVE, INACTIVE
+  joiningDate  String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Expense {
+  id           String   @id @default(cuid())
+  propertyId   String
+  property     Property @relation(fields: [propertyId], references: [id])
+  title        String
+  category     String   // Maintenance, Utilities, Marketing, Salaries, Repairs, Others
+  amount       Int
+  date         String
+  status       String   @default("PAID") // PAID, PENDING
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Notification {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  title        String
+  message      String
+  type         String   @default("INFO") // SUCCESS, INFO, WARNING, DANGER
+  isRead       Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Otp {
+  id        String   @id @default(cuid())
+  email     String
+  code      String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
