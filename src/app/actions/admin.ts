@@ -146,7 +146,7 @@ export async function createProperty(data: any) {
     const ctx = await getAuthContext();
     if (!ctx) throw new Error("Unauthorized");
     
-    const { title, city, area, address, ownerId, masterRent, masterDeposit, leaseStartDate, leaseEndDate, rooms } = data;
+    const { title, city, area, address, ownerId, masterRent, masterDeposit, leaseStartDate, leaseEndDate, description, whyChoose, rooms } = data;
 
     // Owners can only create property for themselves
     const finalOwnerId = ctx.role === "ADMIN" ? ownerId : ctx.userId;
@@ -163,6 +163,8 @@ export async function createProperty(data: any) {
                 masterDeposit: masterDeposit ? parseInt(masterDeposit) : null,
                 leaseStartDate,
                 leaseEndDate,
+                description,
+                whyChoose,
                 status: 'APPROVED'
             }
         });

@@ -17,16 +17,18 @@ export default function RoomDetailClient({ room, property }: any) {
     const [enquiryOpen, setEnquiryOpen] = useState(false);
 
     let images: string[] = [];
-    try { images = JSON.parse(room.images); } catch {}
-    if (!images.length) images = [
+    try { 
+        images = typeof room.images === 'string' ? JSON.parse(room.images) : room.images; 
+    } catch { images = []; }
+    if (!images || !images.length) images = [
         'https://images.unsplash.com/photo-1554995207-c18c203602cb?ixlib=rb-4.0.3',
-        'https://images.unsplash.com/photo-1615529162924-f8605388463a?ixlib=rb-4.0.3',
-        'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?ixlib=rb-4.0.3',
     ];
 
     let amenities: string[] = [];
-    try { amenities = JSON.parse(room.amenities); } catch {}
-    if (!amenities.length) amenities = ['AC', 'WiFi', 'Fully Furnished', 'TV', 'Gym', 'Laundry'];
+    try { 
+        amenities = typeof room.amenities === 'string' ? JSON.parse(room.amenities) : room.amenities; 
+    } catch { amenities = []; }
+    if (!amenities || !amenities.length) amenities = ['AC', 'WiFi', 'Furnished'];
 
     const societyAmenities = [
         { icon: 'fa-dumbbell',     name: 'Gym' },
@@ -146,16 +148,16 @@ export default function RoomDetailClient({ room, property }: any) {
                 </div>
 
                 {/* About */}
-                <div className="px-4 py-4 border-t border-slate-50">
-                    <h2 className="text-base font-bold text-slate-900 mb-3 flex items-center gap-2">
-                        <span className="w-1 h-4 bg-rose-600 rounded-full inline-block" /> About this place
-                    </h2>
-                    <div className="bg-slate-50 rounded-2xl p-4 text-sm text-slate-600 leading-relaxed">
-                        <p>Step into luxury. This premium <strong>{room.type}</strong> is fully optimized for working professionals and students seeking a hassle-free lifestyle in <strong>{property.city}</strong>. With gorgeous natural light, a quiet environment, and proximity to major tech parks, the <strong>{property.title}</strong> property offers unparalleled convenience.</p>
-                        <br />
-                        <p>Your room comes completely furnished with a dedicated workspace, massive wardrobe, and a luxury mattress. The smart community provides robust 24/7 security protecting all residents.</p>
+                {property.description && (
+                    <div className="px-4 py-4 border-t border-slate-50">
+                        <h2 className="text-base font-bold text-slate-900 mb-3 flex items-center gap-2">
+                            <span className="w-1 h-4 bg-rose-600 rounded-full inline-block" /> About this place
+                        </h2>
+                        <div className="bg-slate-50 rounded-2xl p-4 text-sm text-slate-600 leading-relaxed whitespace-pre-line">
+                            {property.description}
+                        </div>
                     </div>
-                </div>
+                )}
 
                 {/* Society amenities */}
                 <div className="px-4 py-4 border-t border-slate-50">
@@ -173,24 +175,16 @@ export default function RoomDetailClient({ room, property }: any) {
                 </div>
 
                 {/* Highlights */}
-                <div className="px-4 py-4 border-t border-slate-50">
-                    <h2 className="text-base font-bold text-slate-900 mb-3 flex items-center gap-2">
-                        <span className="w-1 h-4 bg-rose-600 rounded-full inline-block" /> Why choose this room
-                    </h2>
-                    <ul className="flex flex-col gap-3">
-                        {highlights.map(h => (
-                            <li key={h.title} className="flex items-start gap-3">
-                                <div className="w-10 h-10 flex-shrink-0 rounded-xl bg-rose-50 flex items-center justify-center">
-                                    <i className={`fas ${h.icon} text-rose-600 text-sm`} aria-hidden="true" />
-                                </div>
-                                <div>
-                                    <p className="text-sm font-bold text-slate-800">{h.title}</p>
-                                    <p className="text-xs text-slate-400 mt-0.5">{h.desc}</p>
-                                </div>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
+                {property.whyChoose && (
+                    <div className="px-4 py-4 border-t border-slate-50">
+                        <h2 className="text-base font-bold text-slate-900 mb-3 flex items-center gap-2">
+                            <span className="w-1 h-4 bg-rose-600 rounded-full inline-block" /> Why choose this property
+                        </h2>
+                        <div className="bg-slate-50 rounded-2xl p-4 text-sm text-slate-600 leading-relaxed whitespace-pre-line">
+                            {property.whyChoose}
+                        </div>
+                    </div>
+                )}
 
                 {/* Location */}
                 <div className="px-4 py-4 border-t border-slate-50">

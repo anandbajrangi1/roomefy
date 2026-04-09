@@ -46,6 +46,8 @@ model Property {
   masterDeposit  Int?
   leaseStartDate String?
   leaseEndDate   String?
+  description    String?
+  whyChoose      String?
 
   owner          User     @relation(fields: [ownerId], references: [id])
   rooms    Room[]

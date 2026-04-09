@@ -25,6 +25,7 @@ export default function NewListingView() {
 
     const [propertyData, setPropertyData] = useState({
         title: '', city: '', area: '', address: '', ownerId: '', 
+        description: '', whyChoose: '',
         masterRent: '', masterDeposit: '', leaseStartDate: '', leaseEndDate: '',
         amenities: [] as string[],
         rooms: [{ type: 'Single Room', rent: '', deposit: '', amenities: [], images: [] as string[] }]
@@ -153,7 +154,15 @@ export default function NewListingView() {
                             </div>
                             <div className="md:col-span-2">
                                 <label className={labelCls}>Full Address</label>
-                                <textarea name="address" value={propertyData.address} onChange={handlePropertyChange} rows={3} className={inputCls} placeholder="Complete building address..."></textarea>
+                                <textarea name="address" value={propertyData.address} onChange={handlePropertyChange} rows={2} className={inputCls} placeholder="Complete building address..."></textarea>
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className={labelCls}>About Property (Description)</label>
+                                <textarea name="description" value={(propertyData as any).description} onChange={handlePropertyChange} rows={3} className={inputCls} placeholder="Describe the property, vibe, surroundings..."></textarea>
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className={labelCls}>Why Choose Roomefy at this Property?</label>
+                                <textarea name="whyChoose" value={(propertyData as any).whyChoose} onChange={handlePropertyChange} rows={3} className={inputCls} placeholder="Key highlights, safety, community, convenience..."></textarea>
                             </div>
                             <div className="md:col-span-2">
                                 <label className={labelCls}>Assign Owner (Landlord)</label>

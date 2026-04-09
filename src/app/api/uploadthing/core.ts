@@ -12,7 +12,7 @@ export const ourFileRouter = {
     .middleware(async ({ req }) => {
       const session = await getServerSession(authOptions);
       // If you throw, the user will not be able to upload
-      if (!session || (session.user as any).role !== 'ADMIN') throw new Error("Unauthorized");
+      if (!session || !['ADMIN', 'OWNER'].includes((session.user as any).role)) throw new Error("Unauthorized");
       // Whatever is returned here is accessible in onUploadComplete as `metadata`
       return { userId: (session.user as any).id };
     })
