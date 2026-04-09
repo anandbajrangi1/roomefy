@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { getOwners, createProperty } from '@/app/actions/admin';
+import { UploadDropzone } from '@/lib/uploadthing';
 
 const AMENITIES_LIST = [
     { id: 'wifi', icon: 'fa-wifi', label: 'High-Speed WiFi' },
@@ -26,7 +27,7 @@ export default function NewListingView() {
         title: '', city: '', area: '', address: '', ownerId: '', 
         masterRent: '', masterDeposit: '', leaseStartDate: '', leaseEndDate: '',
         amenities: [] as string[],
-        rooms: [{ type: 'Single Room', rent: '', deposit: '', amenities: [], images: [] }]
+        rooms: [{ type: 'Single Room', rent: '', deposit: '', amenities: [], images: [] as string[] }]
     });
 
     useEffect(() => { getOwners().then(setOwners).catch(console.error); }, []);
@@ -51,6 +52,12 @@ export default function NewListingView() {
     const handleRoomChange = (index: number, field: string, value: any) => {
         const updated = [...propertyData.rooms];
         (updated[index] as any)[field] = value;
+        setPropertyData({ ...propertyData, rooms: updated });
+    };
+
+    const removeImage = (roomIndex: number, imageIndex: number) => {
+        const updated = [...propertyData.rooms];
+        updated[roomIndex].images.splice(imageIndex, 1);
         setPropertyData({ ...propertyData, rooms: updated });
     };
 
@@ -243,6 +250,46 @@ export default function NewListingView() {
                                             <div className="relative">
                                                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">₹</span>
                                                 <input type="number" value={room.deposit} onChange={(e) => handleRoomChange(index, 'deposit', e.target.value)} className={inputCls + " !bg-white pl-8"} placeholder="15000" />
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="md:col-span-2 pt-4">
+                                            <label className={labelCls}>Room Photos</label>
+                                            
+                                            {room.images && room.images.length > 0 && (
+                                                <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 mb-4">
+                                                    {room.images.map((url: string, imgIdx: number) => (
+                                                        <div key={imgIdx} className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 group">
+                                                            <img src={url} alt="" className="w-full h-full object-cover" />
+                                                            <button 
+                                                                type="button" 
+                                                                onClick={() => {
+                                                                    const updated = [...room.images];
+                                                                    updated.splice(imgIdx, 1);
+                                                                    handleRoomChange(index, 'images', updated);
+                                                                }}
+                                                                className="absolute top-1 right-1 w-5 h-5 bg-rose-600 text-white rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                                            >
+                                                                <i className="fas fa-times text-[8px]" />
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            <div className="bg-white border-2 border-dashed border-slate-200 rounded-2xl p-6">
+                                                <UploadDropzone
+                                                    endpoint="roomImage"
+                                                    onClientUploadComplete={(res) => {
+                                                        const urls = res.map(f => f.url);
+                                                        handleRoomChange(index, 'images', [...room.images, ...urls]);
+                                                    }}
+                                                    appearance={{
+                                                        button: "bg-slate-900 text-xs font-bold rounded-lg px-6 py-2 shadow-sm",
+                                                        container: "border-none p-0",
+                                                        allowedContent: "text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2"
+                                                    }}
+                                                />
                                             </div>
                                         </div>
                                     </div>

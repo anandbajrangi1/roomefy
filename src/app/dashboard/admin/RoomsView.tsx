@@ -9,6 +9,7 @@ export default function RoomsView() {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const [editRoom, setEditRoom] = useState<any>(null);
+    const [updating, setUpdating] = useState(false);
 
     const fetchRooms = () => {
         setLoading(true);
@@ -21,6 +22,7 @@ export default function RoomsView() {
 
     const handleRoomUpdate = async (e: any) => {
         e.preventDefault();
+        setUpdating(true);
         try {
             await updateRoomAdvanced(editRoom.id, editRoom);
             setEditRoom(null);
@@ -28,6 +30,8 @@ export default function RoomsView() {
         } catch (err) {
             console.error("Failed to update room:", err);
             alert("Failed to update room.");
+        } finally {
+            setUpdating(false);
         }
     };
 
@@ -172,8 +176,8 @@ export default function RoomsView() {
 
             {/* Edit Modal */}
             {editRoom && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
+                    <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl my-auto animate-in fade-in zoom-in-95 duration-200">
                         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
                             <div>
                                 <h2 className="text-sm font-black text-slate-800">Advanced Room Matrix</h2>
@@ -248,7 +252,7 @@ export default function RoomsView() {
                                 
                                 <div className="col-span-2 md:col-span-3">
                                     <label className={labelCls}>Current Images</label>
-                                    <div className="grid grid-cols-4 gap-3 mb-4">
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
                                         {editRoom.images?.split(',').filter(Boolean).map((img: string, idx: number) => (
                                             <div key={idx} className="relative aspect-video rounded-xl overflow-hidden border border-slate-200 group/img">
                                                 <img src={img} alt="Room" className="w-full h-full object-cover" />
@@ -274,7 +278,6 @@ export default function RoomsView() {
                                                 const newUrls = res.map(f => f.url).join(',');
                                                 const current = editRoom.images ? editRoom.images + ',' : '';
                                                 setEditRoom({...editRoom, images: current + newUrls});
-                                                alert("Upload complete!");
                                             }}
                                             onUploadError={(error: Error) => {
                                                 alert(`ERROR! ${error.message}`);
@@ -290,8 +293,17 @@ export default function RoomsView() {
                             </div>
 
                             <div className="mt-8 flex justify-end gap-3 pt-5 border-t border-slate-100">
-                                <button type="button" onClick={() => setEditRoom(null)} className="px-6 py-3 rounded-xl border border-slate-200 text-slate-500 font-bold text-sm hover:bg-slate-50 transition-colors">Cancel</button>
-                                <button type="submit" className="px-8 py-3 rounded-xl bg-slate-900 text-white font-bold text-sm hover:bg-black transition-colors shadow-md">Deploy Changes</button>
+                                <button type="button" disabled={updating} onClick={() => setEditRoom(null)} className="px-6 py-3 rounded-xl border border-slate-200 text-slate-500 font-bold text-sm hover:bg-slate-50 transition-colors disabled:opacity-50">Cancel</button>
+                                <button type="submit" disabled={updating} className="px-8 py-3 rounded-xl bg-slate-900 text-white font-bold text-sm hover:bg-black transition-colors shadow-md disabled:opacity-70 flex items-center gap-2">
+                                    {updating ? (
+                                        <>
+                                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                            Deploying...
+                                        </>
+                                    ) : (
+                                        'Deploy Changes'
+                                    )}
+                                </button>
                             </div>
                         </form>
                     </div>

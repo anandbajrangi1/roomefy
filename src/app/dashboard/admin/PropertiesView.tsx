@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { getProperties, updatePropertyStatus, deleteProperty, updatePropertyDetails, addRoom, deleteRoom, updateRoomStatus } from "@/app/actions/admin";
+import { UploadDropzone } from "@/lib/uploadthing";
 
 export default function PropertiesView({ onNavigate }: { onNavigate?: (tab: string) => void }) {
     const [properties, setProperties] = useState<any[]>([]);
@@ -11,7 +12,7 @@ export default function PropertiesView({ onNavigate }: { onNavigate?: (tab: stri
     const [editProperty, setEditProperty] = useState<any>(null);
     
     // Add Room state
-    const [newRoomData, setNewRoomData] = useState({ type: '1BHK', rent: '', deposit: '' });
+    const [newRoomData, setNewRoomData] = useState({ type: '1BHK', rent: '', deposit: '', images: '' });
 
     const fetchProperties = () => {
         getProperties()
@@ -61,9 +62,10 @@ export default function PropertiesView({ onNavigate }: { onNavigate?: (tab: stri
             await addRoom(viewRoomsProperty.id, {
                 type: newRoomData.type,
                 rent: Number(newRoomData.rent),
-                deposit: Number(newRoomData.deposit) || 0
+                deposit: Number(newRoomData.deposit) || 0,
+                images: newRoomData.images
             });
-            setNewRoomData({ type: '1BHK', rent: '', deposit: '' });
+            setNewRoomData({ type: '1BHK', rent: '', deposit: '', images: '' });
             fetchProperties();
         } catch (err) {
             console.error(err);
@@ -266,8 +268,8 @@ export default function PropertiesView({ onNavigate }: { onNavigate?: (tab: stri
 
             {/* Edit Property Modal */}
             {editProperty && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
+                    <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl my-auto animate-in fade-in zoom-in-95 duration-200">
                          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
                             <h2 className="text-sm font-black text-slate-800">Edit Property Details</h2>
                             <button onClick={() => setEditProperty(null)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors flex items-center justify-center">
@@ -317,8 +319,8 @@ export default function PropertiesView({ onNavigate }: { onNavigate?: (tab: stri
 
             {/* View Rooms Modal */}
             {viewRoomsProperty && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
+                    <div className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl my-auto flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
                         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
                             <div>
                                 <h2 className="text-sm font-black text-slate-800">Rooms Inventory</h2>
@@ -342,15 +344,22 @@ export default function PropertiesView({ onNavigate }: { onNavigate?: (tab: stri
                                     ) : (
                                         viewRoomsProperty.rooms.map((room: any) => (
                                             <div key={room.id} className="bg-white p-4 rounded-2xl border border-slate-100 flex items-center justify-between shadow-sm">
-                                                <div>
-                                                    <div className="flex items-center gap-2 mb-1">
-                                                        <span className="text-sm font-black text-slate-800">{room.type}</span>
-                                                        <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${room.status === 'AVAILABLE' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-rose-50 text-rose-600 border border-rose-100'}`}>
-                                                            {room.status}
-                                                        </span>
-                                                    </div>
-                                                    <div className="text-[11px] font-bold text-slate-500">
-                                                        ₹{room.rent.toLocaleString()}/mo • Dep: ₹{room.deposit.toLocaleString()}
+                                                <div className="flex items-center gap-4 text-left">
+                                                    {room.images?.split(',')[0] && (
+                                                        <div className="w-12 h-12 rounded-lg overflow-hidden border border-slate-100 flex-shrink-0">
+                                                            <img src={room.images.split(',')[0]} alt="" className="w-full h-full object-cover" />
+                                                        </div>
+                                                    )}
+                                                    <div>
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <span className="text-sm font-black text-slate-800">{room.type}</span>
+                                                            <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${room.status === 'AVAILABLE' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-rose-50 text-rose-600 border border-rose-100'}`}>
+                                                                {room.status}
+                                                            </span>
+                                                        </div>
+                                                        <div className="text-[11px] font-bold text-slate-500">
+                                                            ₹{room.rent.toLocaleString()}/mo • Dep: ₹{room.deposit.toLocaleString()}
+                                                        </div>
                                                     </div>
                                                 </div>
                                                 <div className="flex gap-2">
@@ -369,7 +378,7 @@ export default function PropertiesView({ onNavigate }: { onNavigate?: (tab: stri
                                 {/* Add Room Form */}
                                 <div>
                                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Add New Room</h3>
-                                    <form onSubmit={handleAddRoomSubmit} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-4">
+                                    <form onSubmit={handleAddRoomSubmit} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-4 text-left">
                                         <div>
                                             <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Room Type</label>
                                             <select value={newRoomData.type} onChange={e => setNewRoomData({...newRoomData, type: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-rose-500 transition-all font-sans">
@@ -388,6 +397,47 @@ export default function PropertiesView({ onNavigate }: { onNavigate?: (tab: stri
                                             <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Deposit (₹)</label>
                                             <input type="number" required value={newRoomData.deposit} onChange={e => setNewRoomData({...newRoomData, deposit: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-rose-500 transition-all" />
                                         </div>
+
+                                        <div className="border-t border-slate-100 pt-4 mt-2">
+                                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Room Photos</label>
+                                            
+                                            {newRoomData.images && (
+                                                <div className="grid grid-cols-3 gap-2 mb-4">
+                                                    {newRoomData.images.split(',').filter(Boolean).map((url, i) => (
+                                                        <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 group">
+                                                            <img src={url} alt="" className="w-full h-full object-cover" />
+                                                            <button 
+                                                                type="button" 
+                                                                onClick={() => {
+                                                                    const urls = newRoomData.images.split(',').filter(Boolean);
+                                                                    setNewRoomData({...newRoomData, images: urls.filter((_, idx) => idx !== i).join(',')});
+                                                                }}
+                                                                className="absolute top-1 right-1 w-5 h-5 bg-rose-600 text-white rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                                            >
+                                                                <i className="fas fa-times text-[8px]" />
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-4">
+                                                <UploadDropzone
+                                                    endpoint="roomImage"
+                                                    onClientUploadComplete={(res) => {
+                                                        const urls = res.map(f => f.url).join(',');
+                                                        const current = newRoomData.images ? newRoomData.images + ',' : '';
+                                                        setNewRoomData({...newRoomData, images: current + urls});
+                                                    }}
+                                                    appearance={{
+                                                        button: "bg-slate-900 text-xs font-bold rounded-lg px-4 py-2 shadow-sm",
+                                                        container: "border-none p-0",
+                                                        allowedContent: "hidden"
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+
                                         <button type="submit" className="w-full py-2.5 rounded-xl bg-slate-900 text-white font-bold text-sm hover:bg-black transition-colors flex justify-center items-center gap-2">
                                             <i className="fas fa-plus" /> Add to Property
                                         </button>

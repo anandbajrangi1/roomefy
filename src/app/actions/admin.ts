@@ -7,13 +7,18 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import bcrypt from "bcryptjs";
 import { sendWelcomeEmail, sendLeaseConfirmationEmail, sendMaintenanceUpdateEmail } from "@/lib/mail";
 
-const isAdmin = async () => {
+const getAuthContext = async () => {
     const session = await getServerSession(authOptions);
-    return session?.user && (session.user as any).role === "ADMIN";
+    if (!session?.user) return null;
+    return {
+        userId: (session.user as any).id,
+        role: (session.user as any).role
+    };
 };
 
 export async function createTenantAccount(data: any) {
-    if (!await isAdmin()) throw new Error("Unauthorized");
+    const ctx = await getAuthContext();
+    if (!ctx || ctx.role !== "ADMIN") throw new Error("Unauthorized");
     
     const { name, email, phone, password } = data;
     
@@ -46,7 +51,8 @@ export async function createTenantAccount(data: any) {
 }
 
 export async function getDashboardStats() {
-    if (!await isAdmin()) throw new Error("Unauthorized");
+    const ctx = await getAuthContext();
+    if (!ctx || ctx.role !== "ADMIN") throw new Error("Unauthorized");
 
     const inquiries = await prisma.inquiry.count();
     const bookings = await prisma.booking.count();
@@ -64,15 +70,21 @@ export async function getDashboardStats() {
 }
 
 export async function getInquiries() {
-    if (!await isAdmin()) throw new Error("Unauthorized");
+    const ctx = await getAuthContext();
+    if (!ctx) throw new Error("Unauthorized");
+
+    const where = ctx.role === "ADMIN" ? {} : { property: { ownerId: ctx.userId } };
+
     return prisma.inquiry.findMany({
+        where,
         include: { user: true, property: true },
         orderBy: { id: 'desc' }
     });
 }
 
 export async function toggleInquirySharing(id: string, isSharedWithOwner: boolean) {
-    if (!await isAdmin()) throw new Error("Unauthorized");
+    const ctx = await getAuthContext();
+    if (!ctx || ctx.role !== "ADMIN") throw new Error("Unauthorized");
     return prisma.inquiry.update({
         where: { id },
         data: { isSharedWithOwner }
@@ -80,8 +92,13 @@ export async function toggleInquirySharing(id: string, isSharedWithOwner: boolea
 }
 
 export async function getAdminBookings() {
-    if (!await isAdmin()) throw new Error("Unauthorized");
+    const ctx = await getAuthContext();
+    if (!ctx) throw new Error("Unauthorized");
+
+    const where = ctx.role === "ADMIN" ? {} : { room: { property: { ownerId: ctx.userId } } };
+
     return prisma.booking.findMany({
+        where,
         include: { 
             tenant: true,
             room: { include: { property: true } }
@@ -93,8 +110,13 @@ export async function getAdminBookings() {
 
 
 export async function getProperties() {
-    if (!await isAdmin()) throw new Error("Unauthorized");
+    const ctx = await getAuthContext();
+    if (!ctx) throw new Error("Unauthorized");
+
+    const where = ctx.role === "ADMIN" ? {} : { ownerId: ctx.userId };
+
     return prisma.property.findMany({
+        where,
         include: {
             owner: true,
             rooms: true
@@ -104,7 +126,16 @@ export async function getProperties() {
 }
 
 export async function getOwners() {
-    if (!await isAdmin()) throw new Error("Unauthorized");
+    const ctx = await getAuthContext();
+    if (!ctx) throw new Error("Unauthorized");
+
+    if (ctx.role === "OWNER") {
+        return prisma.user.findMany({
+            where: { id: ctx.userId },
+            select: { id: true, name: true, email: true }
+        });
+    }
+
     return prisma.user.findMany({
         where: { role: { in: ['OWNER', 'ADMIN'] } },
         select: { id: true, name: true, email: true }
@@ -112,9 +143,13 @@ export async function getOwners() {
 }
 
 export async function createProperty(data: any) {
-    if (!await isAdmin()) throw new Error("Unauthorized");
+    const ctx = await getAuthContext();
+    if (!ctx) throw new Error("Unauthorized");
     
     const { title, city, area, address, ownerId, masterRent, masterDeposit, leaseStartDate, leaseEndDate, rooms } = data;
+
+    // Owners can only create property for themselves
+    const finalOwnerId = ctx.role === "ADMIN" ? ownerId : ctx.userId;
     
     return prisma.$transaction(async (tx) => {
         const property = await tx.property.create({
@@ -123,7 +158,7 @@ export async function createProperty(data: any) {
                 city,
                 area,
                 address,
-                ownerId,
+                ownerId: finalOwnerId,
                 masterRent: masterRent ? parseInt(masterRent) : null,
                 masterDeposit: masterDeposit ? parseInt(masterDeposit) : null,
                 leaseStartDate,
@@ -153,7 +188,8 @@ export async function createProperty(data: any) {
 }
 
 export async function updatePropertyStatus(id: string, status: string) {
-    if (!await isAdmin()) throw new Error("Unauthorized");
+    const ctx = await getAuthContext();
+    if (!ctx || ctx.role !== "ADMIN") throw new Error("Unauthorized");
     return prisma.property.update({
         where: { id },
         data: { status }
@@ -161,7 +197,8 @@ export async function updatePropertyStatus(id: string, status: string) {
 }
 
 export async function deleteProperty(id: string) {
-    if (!await isAdmin()) throw new Error("Unauthorized");
+    const ctx = await getAuthContext();
+    if (!ctx || ctx.role !== "ADMIN") throw new Error("Unauthorized");
     return prisma.$transaction(async (tx) => {
         // Find all rooms in the property
         const rooms = await tx.room.findMany({ where: { propertyId: id } });
@@ -188,8 +225,15 @@ export async function deleteProperty(id: string) {
     });
 }
 
-export async function updatePropertyDetails(id: string, data: { title: string, city: string, area: string, address: string, masterRent?: number | string | null, masterDeposit?: number | string | null, leaseStartDate?: string | null, leaseEndDate?: string | null }) {
-    if (!await isAdmin()) throw new Error("Unauthorized");
+export async function updatePropertyDetails(id: string, data: any) {
+    const ctx = await getAuthContext();
+    if (!ctx) throw new Error("Unauthorized");
+
+    // Check ownership if OWNER
+    if (ctx.role === "OWNER") {
+        const prop = await prisma.property.findUnique({ where: { id } });
+        if (!prop || prop.ownerId !== ctx.userId) throw new Error("Unauthorized");
+    }
     return prisma.property.update({
         where: { id },
         data: {
@@ -200,21 +244,33 @@ export async function updatePropertyDetails(id: string, data: { title: string, c
     });
 }
 
-export async function addRoom(propertyId: string, data: { type: string, rent: number, deposit: number }) {
-    if (!await isAdmin()) throw new Error("Unauthorized");
+export async function addRoom(propertyId: string, data: any) {
+    const ctx = await getAuthContext();
+    if (!ctx) throw new Error("Unauthorized");
+
+    if (ctx.role === "OWNER") {
+        const prop = await prisma.property.findUnique({ where: { id: propertyId } });
+        if (!prop || prop.ownerId !== ctx.userId) throw new Error("Unauthorized");
+    }
     return prisma.room.create({
         data: {
             ...data,
             propertyId,
-            amenities: '[]',
-            images: '[]',
+            amenities: data.amenities || '[]',
+            images: data.images || '[]',
             status: 'AVAILABLE'
         }
     });
 }
 
 export async function deleteRoom(id: string) {
-    if (!await isAdmin()) throw new Error("Unauthorized");
+    const ctx = await getAuthContext();
+    if (!ctx) throw new Error("Unauthorized");
+
+    if (ctx.role === "OWNER") {
+        const room = await prisma.room.findUnique({ where: { id }, include: { property: true } });
+        if (!room || room.property.ownerId !== ctx.userId) throw new Error("Unauthorized");
+    }
     return prisma.$transaction(async (tx) => {
         await tx.wishlist.deleteMany({ where: { roomId: id } });
         await tx.booking.deleteMany({ where: { roomId: id } });
@@ -223,7 +279,13 @@ export async function deleteRoom(id: string) {
 }
 
 export async function updateRoomStatus(id: string, status: string) {
-    if (!await isAdmin()) throw new Error("Unauthorized");
+    const ctx = await getAuthContext();
+    if (!ctx) throw new Error("Unauthorized");
+
+    if (ctx.role === "OWNER") {
+        const room = await prisma.room.findUnique({ where: { id }, include: { property: true } });
+        if (!room || room.property.ownerId !== ctx.userId) throw new Error("Unauthorized");
+    }
     return prisma.room.update({
         where: { id },
         data: { status }
@@ -231,7 +293,8 @@ export async function updateRoomStatus(id: string, status: string) {
 }
 
 export async function getComplaints() {
-    if (!await isAdmin()) throw new Error("Unauthorized");
+    const ctx = await getAuthContext();
+    if (!ctx || ctx.role !== "ADMIN") throw new Error("Unauthorized");
     return prisma.complaint.findMany({
         include: {
             tenant: true,
@@ -242,7 +305,8 @@ export async function getComplaints() {
 }
 
 export async function updateComplaintStatus(id: string, status: string, adminNote?: string) {
-    if (!await isAdmin()) throw new Error("Unauthorized");
+    const ctx = await getAuthContext();
+    if (!ctx || ctx.role !== "ADMIN") throw new Error("Unauthorized");
     const complaint = await prisma.complaint.update({
         where: { id },
         data: { 
@@ -273,7 +337,8 @@ export async function updateComplaintStatus(id: string, status: string, adminNot
 }
 
 export async function getPendingUsers() {
-    if (!await isAdmin()) throw new Error("Unauthorized");
+    const ctx = await getAuthContext();
+    if (!ctx || ctx.role !== "ADMIN") throw new Error("Unauthorized");
     return prisma.user.findMany({
         where: { 
             role: { in: ['TENANT', 'OWNER'] },
@@ -284,7 +349,8 @@ export async function getPendingUsers() {
 }
 
 export async function getProcurements() {
-    if (!await isAdmin()) throw new Error("Unauthorized");
+    const ctx = await getAuthContext();
+    if (!ctx || ctx.role !== "ADMIN") throw new Error("Unauthorized");
     return prisma.procurement.findMany({
         include: { property: true },
         orderBy: { purchaseDate: 'desc' }
@@ -292,7 +358,8 @@ export async function getProcurements() {
 }
 
 export async function addProcurement(data: any) {
-    if (!await isAdmin()) throw new Error("Unauthorized");
+    const ctx = await getAuthContext();
+    if (!ctx || ctx.role !== "ADMIN") throw new Error("Unauthorized");
     return prisma.procurement.create({
         data: {
             ...data,
@@ -303,7 +370,8 @@ export async function addProcurement(data: any) {
 }
 
 export async function updateProcurementStatus(id: string, status: string) {
-    if (!await isAdmin()) throw new Error("Unauthorized");
+    const ctx = await getAuthContext();
+    if (!ctx || ctx.role !== "ADMIN") throw new Error("Unauthorized");
     return prisma.procurement.update({
         where: { id },
         data: { status }
@@ -311,7 +379,8 @@ export async function updateProcurementStatus(id: string, status: string) {
 }
 
 export async function getEmployees() {
-    if (!await isAdmin()) throw new Error("Unauthorized");
+    const ctx = await getAuthContext();
+    if (!ctx || ctx.role !== "ADMIN") throw new Error("Unauthorized");
     return prisma.employee.findMany({
         include: { property: true },
         orderBy: { joiningDate: 'desc' }
@@ -319,7 +388,8 @@ export async function getEmployees() {
 }
 
 export async function addEmployee(data: any) {
-    if (!await isAdmin()) throw new Error("Unauthorized");
+    const ctx = await getAuthContext();
+    if (!ctx || ctx.role !== "ADMIN") throw new Error("Unauthorized");
     return prisma.employee.create({
         data: {
             ...data,
@@ -329,7 +399,8 @@ export async function addEmployee(data: any) {
 }
 
 export async function updateEmployeeStatus(id: string, status: string) {
-    if (!await isAdmin()) throw new Error("Unauthorized");
+    const ctx = await getAuthContext();
+    if (!ctx || ctx.role !== "ADMIN") throw new Error("Unauthorized");
     return prisma.employee.update({
         where: { id },
         data: { status }
@@ -337,7 +408,8 @@ export async function updateEmployeeStatus(id: string, status: string) {
 }
 
 export async function getExpenses() {
-    if (!await isAdmin()) throw new Error("Unauthorized");
+    const ctx = await getAuthContext();
+    if (!ctx || ctx.role !== "ADMIN") throw new Error("Unauthorized");
     return prisma.expense.findMany({
         include: { property: true },
         orderBy: { date: 'desc' }
@@ -345,7 +417,8 @@ export async function getExpenses() {
 }
 
 export async function addExpense(data: any) {
-    if (!await isAdmin()) throw new Error("Unauthorized");
+    const ctx = await getAuthContext();
+    if (!ctx || ctx.role !== "ADMIN") throw new Error("Unauthorized");
     return prisma.expense.create({
         data: {
             ...data,
@@ -355,7 +428,8 @@ export async function addExpense(data: any) {
 }
 
 export async function updateExpenseStatus(id: string, status: string) {
-    if (!await isAdmin()) throw new Error("Unauthorized");
+    const ctx = await getAuthContext();
+    if (!ctx || ctx.role !== "ADMIN") throw new Error("Unauthorized");
     return prisma.expense.update({
         where: { id },
         data: { status }
@@ -363,7 +437,8 @@ export async function updateExpenseStatus(id: string, status: string) {
 }
 
 export async function verifyUser(id: string, status: string, note?: string) {
-    if (!await isAdmin()) throw new Error("Unauthorized");
+    const ctx = await getAuthContext();
+    if (!ctx || ctx.role !== "ADMIN") throw new Error("Unauthorized");
     const user = await prisma.user.update({
         where: { id },
         data: { 
@@ -386,7 +461,8 @@ export async function verifyUser(id: string, status: string, note?: string) {
 }
 
 export async function getAnalyticsData() {
-    if (!await isAdmin()) throw new Error("Unauthorized");
+    const ctx = await getAuthContext();
+    if (!ctx || ctx.role !== "ADMIN") throw new Error("Unauthorized");
     
     const [totalRooms, occupiedRooms, totalRevenue, totalExpenses, totalTenants, recentTenants, recentInquiries, allRooms] = await Promise.all([
         prisma.room.count(),
@@ -438,7 +514,8 @@ export async function getAnalyticsData() {
 }
 
 export async function getPropertyPerformance() {
-    if (!await isAdmin()) throw new Error("Unauthorized");
+    const ctx = await getAuthContext();
+    if (!ctx || ctx.role !== "ADMIN") throw new Error("Unauthorized");
     
     const properties = await prisma.property.findMany({
         include: {
@@ -463,7 +540,8 @@ export async function getPropertyPerformance() {
 }
 
 export async function generateExportData(type: string) {
-    if (!await isAdmin()) throw new Error("Unauthorized");
+    const ctx = await getAuthContext();
+    if (!ctx || ctx.role !== "ADMIN") throw new Error("Unauthorized");
     
     switch(type) {
         case 'BOOKINGS':
@@ -478,8 +556,13 @@ export async function generateExportData(type: string) {
 }
 
 export async function getAllRoomsAdmin() {
-    if (!await isAdmin()) throw new Error("Unauthorized");
+    const ctx = await getAuthContext();
+    if (!ctx) throw new Error("Unauthorized");
+
+    const where = ctx.role === "ADMIN" ? {} : { property: { ownerId: ctx.userId } };
+
     return prisma.room.findMany({
+        where,
         include: {
             property: true,
             bookings: {
@@ -492,7 +575,13 @@ export async function getAllRoomsAdmin() {
 }
 
 export async function updateRoomAdvanced(id: string, data: any) {
-    if (!await isAdmin()) throw new Error("Unauthorized");
+    const ctx = await getAuthContext();
+    if (!ctx) throw new Error("Unauthorized");
+
+    if (ctx.role === "OWNER") {
+        const room = await prisma.room.findUnique({ where: { id }, include: { property: true } });
+        if (!room || room.property.ownerId !== ctx.userId) throw new Error("Unauthorized");
+    }
     return prisma.room.update({
         where: { id },
         data: {
@@ -511,7 +600,8 @@ export async function updateRoomAdvanced(id: string, data: any) {
 }
 
 export async function getActiveTenants() {
-    if (!await isAdmin()) throw new Error("Unauthorized");
+    const ctx = await getAuthContext();
+    if (!ctx || ctx.role !== "ADMIN") throw new Error("Unauthorized");
     return prisma.user.findMany({
         where: { 
             role: 'TENANT',
@@ -530,7 +620,8 @@ export async function getActiveTenants() {
 }
 
 export async function getAvailableRooms() {
-    if (!await isAdmin()) throw new Error("Unauthorized");
+    const ctx = await getAuthContext();
+    if (!ctx || ctx.role !== "ADMIN") throw new Error("Unauthorized");
     return prisma.room.findMany({
         where: { status: 'AVAILABLE' },
         include: { property: true },
@@ -539,7 +630,8 @@ export async function getAvailableRooms() {
 }
 
 export async function assignTenantToRoom(tenantId: string, roomId: string, data: any) {
-    if (!await isAdmin()) throw new Error("Unauthorized");
+    const ctx = await getAuthContext();
+    if (!ctx || ctx.role !== "ADMIN") throw new Error("Unauthorized");
 
     return prisma.$transaction(async (tx) => {
         // Create Booking
@@ -587,7 +679,8 @@ export async function finalizeAssignmentAndNotify(tenantId: string, roomId: stri
 }
 
 export async function updateTenantLease(bookingId: string, data: any) {
-    if (!await isAdmin()) throw new Error("Unauthorized");
+    const ctx = await getAuthContext();
+    if (!ctx || ctx.role !== "ADMIN") throw new Error("Unauthorized");
     return prisma.booking.update({
         where: { id: bookingId },
         data: {
@@ -605,7 +698,8 @@ export async function updateTenantLease(bookingId: string, data: any) {
 }
 
 export async function generateMonthlyInvoices() {
-    if (!await isAdmin()) throw new Error("Unauthorized");
+    const ctx = await getAuthContext();
+    if (!ctx || ctx.role !== "ADMIN") throw new Error("Unauthorized");
     
     // Get all active bookings
     const activeBookings = await prisma.booking.findMany({
@@ -660,7 +754,8 @@ export async function generateMonthlyInvoices() {
 }
 
 export async function verifyTenantDocuments(tenantId: string, status: string, note?: string) {
-    if (!await isAdmin()) throw new Error("Unauthorized");
+    const ctx = await getAuthContext();
+    if (!ctx || ctx.role !== "ADMIN") throw new Error("Unauthorized");
 
     const user = await prisma.user.update({
         where: { id: tenantId },
