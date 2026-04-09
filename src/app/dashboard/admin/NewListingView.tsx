@@ -82,9 +82,10 @@ export default function NewListingView() {
         try {
             await createProperty(propertyData); 
             setSuccess(true);
-        } catch (err) { 
+        } catch (err: any) { 
             console.error("Failed to create property:", err);
-            alert("Failed to create property. Please try again."); 
+            const msg = err.message || "Unknown error";
+            alert(`Failed to create property: ${msg}. If you just updated the app, please ensure you've pushed database changes.`); 
         } finally { 
             setLoading(false); 
         }

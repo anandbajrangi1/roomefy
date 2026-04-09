@@ -141,52 +141,62 @@ export async function getOwners() {
         select: { id: true, name: true, email: true }
     });
 }
+const safeInt = (val: any, fallback: number | null = null) => {
+    if (val === null || val === undefined || val === '') return fallback;
+    const parsed = parseInt(val.toString());
+    return isNaN(parsed) ? fallback : parsed;
+};
 
 export async function createProperty(data: any) {
     const ctx = await getAuthContext();
     if (!ctx) throw new Error("Unauthorized");
     
-    const { title, city, area, address, ownerId, masterRent, masterDeposit, leaseStartDate, leaseEndDate, description, whyChoose, rooms } = data;
+    try {
+        const { title, city, area, address, ownerId, masterRent, masterDeposit, leaseStartDate, leaseEndDate, description, whyChoose, rooms } = data;
 
-    // Owners can only create property for themselves
-    const finalOwnerId = ctx.role === "ADMIN" ? ownerId : ctx.userId;
-    
-    return prisma.$transaction(async (tx) => {
-        const property = await tx.property.create({
-            data: {
-                title,
-                city,
-                area,
-                address,
-                ownerId: finalOwnerId,
-                masterRent: masterRent ? parseInt(masterRent) : null,
-                masterDeposit: masterDeposit ? parseInt(masterDeposit) : null,
-                leaseStartDate,
-                leaseEndDate,
-                description,
-                whyChoose,
-                status: 'APPROVED'
-            }
-        });
-
-        if (rooms && rooms.length > 0) {
-            for (const room of rooms) {
-                await tx.room.create({
-                    data: {
-                        propertyId: property.id,
-                        type: room.type,
-                        rent: parseInt(room.rent || '0') || 0,
-                        deposit: parseInt(room.deposit || '0') || 0,
-                        amenities: JSON.stringify(room.amenities || []),
-                        images: JSON.stringify(room.images || []),
-                        status: 'AVAILABLE'
-                    }
-                });
-            }
-        }
+        // Owners can only create property for themselves
+        const finalOwnerId = ctx.role === "ADMIN" ? ownerId : ctx.userId;
         
-        return property;
-    });
+        return await prisma.$transaction(async (tx) => {
+            const property = await tx.property.create({
+                data: {
+                    title,
+                    city,
+                    area,
+                    address,
+                    ownerId: finalOwnerId,
+                    masterRent: safeInt(masterRent),
+                    masterDeposit: safeInt(masterDeposit),
+                    leaseStartDate,
+                    leaseEndDate,
+                    description,
+                    whyChoose,
+                    status: 'APPROVED'
+                }
+            });
+
+            if (rooms && rooms.length > 0) {
+                for (const room of rooms) {
+                    await tx.room.create({
+                        data: {
+                            propertyId: property.id,
+                            type: room.type,
+                            rent: safeInt(room.rent, 0) || 0,
+                            deposit: safeInt(room.deposit, 0) || 0,
+                            amenities: JSON.stringify(room.amenities || []),
+                            images: JSON.stringify(room.images || []),
+                            status: 'AVAILABLE'
+                        }
+                    });
+                }
+            }
+            
+            return property;
+        });
+    } catch (error) {
+        console.error("CRITICAL ERROR in createProperty:", error);
+        throw error;
+    }
 }
 
 export async function updatePropertyStatus(id: string, status: string) {
