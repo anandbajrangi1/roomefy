@@ -80,12 +80,15 @@ export default function NewListingView() {
 
         setLoading(true);
         try {
-            await createProperty(propertyData); 
-            setSuccess(true);
+            const res = await createProperty(propertyData); 
+            if (res.success) {
+                setSuccess(true);
+            } else {
+                alert(`Failed to create property: ${res.error}. If you just updated the app, please ensure you've pushed database changes.`); 
+            }
         } catch (err: any) { 
             console.error("Failed to create property:", err);
-            const msg = err.message || "Unknown error";
-            alert(`Failed to create property: ${msg}. If you just updated the app, please ensure you've pushed database changes.`); 
+            alert("An unexpected network error occurred. Please check your connection and try again."); 
         } finally { 
             setLoading(false); 
         }

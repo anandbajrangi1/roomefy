@@ -157,8 +157,8 @@ export async function createProperty(data: any) {
         // Owners can only create property for themselves
         const finalOwnerId = ctx.role === "ADMIN" ? ownerId : ctx.userId;
         
-        return await prisma.$transaction(async (tx) => {
-            const property = await tx.property.create({
+        const property = await prisma.$transaction(async (tx) => {
+            const prop = await tx.property.create({
                 data: {
                     title,
                     city,
@@ -179,7 +179,7 @@ export async function createProperty(data: any) {
                 for (const room of rooms) {
                     await tx.room.create({
                         data: {
-                            propertyId: property.id,
+                            propertyId: prop.id,
                             type: room.type,
                             rent: safeInt(room.rent, 0) || 0,
                             deposit: safeInt(room.deposit, 0) || 0,
@@ -191,11 +191,16 @@ export async function createProperty(data: any) {
                 }
             }
             
-            return property;
+            return prop;
         });
-    } catch (error) {
+
+        return { success: true, property };
+    } catch (error: any) {
         console.error("CRITICAL ERROR in createProperty:", error);
-        throw error;
+        return { 
+            success: false, 
+            error: error.message || "An unexpected database error occurred while creating the property listing." 
+        };
     }
 }
 
