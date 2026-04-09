@@ -18,8 +18,18 @@ export default function RoomDetailClient({ room, property }: any) {
 
     let images: string[] = [];
     try { 
-        images = typeof room.images === 'string' ? JSON.parse(room.images) : room.images; 
-    } catch { images = []; }
+        if (typeof room.images === 'string') {
+            if (room.images.startsWith('[') || room.images.startsWith('{')) {
+                images = JSON.parse(room.images);
+            } else {
+                images = room.images.split(',').filter(Boolean);
+            }
+        } else {
+            images = room.images;
+        }
+    } catch { 
+        images = typeof room.images === 'string' ? room.images.split(',').filter(Boolean) : []; 
+    }
     if (!images || !images.length) images = [
         'https://images.unsplash.com/photo-1554995207-c18c203602cb?ixlib=rb-4.0.3',
     ];

@@ -148,7 +148,10 @@ export default function RoomsView() {
                                         </td>
                                         <td className="p-4 pr-6 align-middle text-right">
                                             <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button onClick={() => setEditRoom(room)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 transition-all flex items-center justify-center shadow-sm" title="Advanced Edit">
+                                                <button onClick={() => {
+                                                    const imagesArray = typeof room.images === 'string' ? (room.images.startsWith('[') ? JSON.parse(room.images) : room.images.split(',').filter(Boolean)) : room.images;
+                                                    setEditRoom({...room, images: imagesArray || []});
+                                                }} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 transition-all flex items-center justify-center shadow-sm" title="Advanced Edit">
                                                     <i className="far fa-edit" />
                                                 </button>
                                                 <button onClick={() => handleDelete(room.id)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-rose-600 hover:border-rose-200 hover:bg-rose-50 transition-all flex items-center justify-center shadow-sm" title="Delete Room">
@@ -253,14 +256,13 @@ export default function RoomsView() {
                                 <div className="col-span-2 md:col-span-3">
                                     <label className={labelCls}>Current Images</label>
                                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
-                                        {editRoom.images?.split(',').filter(Boolean).map((img: string, idx: number) => (
+                                        {editRoom.images && Array.isArray(editRoom.images) && editRoom.images.map((img: string, idx: number) => (
                                             <div key={idx} className="relative aspect-video rounded-xl overflow-hidden border border-slate-200 group/img">
                                                 <img src={img} alt="Room" className="w-full h-full object-cover" />
                                                 <button 
                                                     type="button"
                                                     onClick={() => {
-                                                        const current = editRoom.images.split(',').filter(Boolean);
-                                                        const updated = current.filter((_:any, i:any) => i !== idx).join(',');
+                                                        const updated = editRoom.images.filter((_:any, i:any) => i !== idx);
                                                         setEditRoom({...editRoom, images: updated});
                                                     }}
                                                     className="absolute top-1 right-1 w-6 h-6 bg-rose-600 text-white rounded-lg flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity"
@@ -275,9 +277,9 @@ export default function RoomsView() {
                                         <UploadDropzone
                                             endpoint="roomImage"
                                             onClientUploadComplete={(res) => {
-                                                const newUrls = res.map(f => f.url).join(',');
-                                                const current = editRoom.images ? editRoom.images + ',' : '';
-                                                setEditRoom({...editRoom, images: current + newUrls});
+                                                const newUrls = res.map(f => f.url);
+                                                const current = Array.isArray(editRoom.images) ? editRoom.images : [];
+                                                setEditRoom({...editRoom, images: [...current, ...newUrls]});
                                             }}
                                             onUploadError={(error: Error) => {
                                                 alert(`ERROR! ${error.message}`);

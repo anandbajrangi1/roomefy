@@ -12,7 +12,7 @@ export default function PropertiesView({ onNavigate }: { onNavigate?: (tab: stri
     const [editProperty, setEditProperty] = useState<any>(null);
     
     // Add Room state
-    const [newRoomData, setNewRoomData] = useState({ type: '1BHK', rent: '', deposit: '', images: '' });
+    const [newRoomData, setNewRoomData] = useState({ type: '1BHK', rent: '', deposit: '', images: [] as string[] });
 
     const fetchProperties = () => {
         getProperties()
@@ -63,9 +63,9 @@ export default function PropertiesView({ onNavigate }: { onNavigate?: (tab: stri
                 type: newRoomData.type,
                 rent: Number(newRoomData.rent),
                 deposit: Number(newRoomData.deposit) || 0,
-                images: newRoomData.images
+                images: newRoomData.images // Already an array, will be stringified in server action
             });
-            setNewRoomData({ type: '1BHK', rent: '', deposit: '', images: '' });
+            setNewRoomData({ type: '1BHK', rent: '', deposit: '', images: [] });
             fetchProperties();
         } catch (err) {
             console.error(err);
@@ -401,16 +401,15 @@ export default function PropertiesView({ onNavigate }: { onNavigate?: (tab: stri
                                         <div className="border-t border-slate-100 pt-4 mt-2">
                                             <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Room Photos</label>
                                             
-                                            {newRoomData.images && (
+                                            {newRoomData.images && newRoomData.images.length > 0 && (
                                                 <div className="grid grid-cols-3 gap-2 mb-4">
-                                                    {newRoomData.images.split(',').filter(Boolean).map((url, i) => (
+                                                    {newRoomData.images.map((url, i) => (
                                                         <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 group">
                                                             <img src={url} alt="" className="w-full h-full object-cover" />
                                                             <button 
                                                                 type="button" 
                                                                 onClick={() => {
-                                                                    const urls = newRoomData.images.split(',').filter(Boolean);
-                                                                    setNewRoomData({...newRoomData, images: urls.filter((_, idx) => idx !== i).join(',')});
+                                                                    setNewRoomData({...newRoomData, images: newRoomData.images.filter((_, idx) => idx !== i)});
                                                                 }}
                                                                 className="absolute top-1 right-1 w-5 h-5 bg-rose-600 text-white rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                                                             >
@@ -420,14 +419,13 @@ export default function PropertiesView({ onNavigate }: { onNavigate?: (tab: stri
                                                     ))}
                                                 </div>
                                             )}
-
+ 
                                             <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-4">
                                                 <UploadDropzone
                                                     endpoint="roomImage"
                                                     onClientUploadComplete={(res) => {
-                                                        const urls = res.map(f => f.url).join(',');
-                                                        const current = newRoomData.images ? newRoomData.images + ',' : '';
-                                                        setNewRoomData({...newRoomData, images: current + urls});
+                                                        const urls = res.map(f => f.url);
+                                                        setNewRoomData({...newRoomData, images: [...newRoomData.images, ...urls]});
                                                     }}
                                                     appearance={{
                                                         button: "bg-slate-900 text-xs font-bold rounded-lg px-4 py-2 shadow-sm",

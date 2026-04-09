@@ -258,8 +258,8 @@ export async function addRoom(propertyId: string, data: any) {
         data: {
             ...data,
             propertyId,
-            amenities: data.amenities || '[]',
-            images: data.images || '[]',
+            amenities: typeof data.amenities === 'string' ? data.amenities : JSON.stringify(data.amenities || []),
+            images: typeof data.images === 'string' ? data.images : JSON.stringify(data.images || []),
             status: 'AVAILABLE'
         }
     });
@@ -596,7 +596,7 @@ export async function updateRoomAdvanced(id: string, data: any) {
             deposit: parseInt(data.deposit || '0'),
             status: data.status,
             type: data.type,
-            images: data.images
+            images: typeof data.images === 'string' ? data.images : JSON.stringify(data.images || [])
         }
     });
 }
