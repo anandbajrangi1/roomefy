@@ -17,6 +17,8 @@ export default function SearchClient({ initialRooms, initialQuery, initialCity }
     const [wishlist, setWishlist] = useState<string[]>([]);
     const [typeFilter, setTypeFilter] = useState('All');
     const [sortOrder, setSortOrder] = useState('Recommended');
+    const [genderFilter, setGenderFilter] = useState('Any');
+    const [propTypeFilter, setPropTypeFilter] = useState('All');
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
@@ -30,6 +32,15 @@ export default function SearchClient({ initialRooms, initialQuery, initialCity }
 
     let filteredRooms = [...rooms];
     if (typeFilter !== 'All') filteredRooms = filteredRooms.filter(r => r.type.toLowerCase().includes(typeFilter.toLowerCase()));
+    
+    // PropTech Filters
+    if (genderFilter !== 'Any') {
+        filteredRooms = filteredRooms.filter(r => r.genderPreference === genderFilter);
+    }
+    if (propTypeFilter !== 'All') {
+        filteredRooms = filteredRooms.filter(r => r.propertyType === propTypeFilter);
+    }
+
     if (sortOrder === 'Price: Low to High') filteredRooms.sort((a, b) => parseInt(a.price.replace(/\D/g, '')) - parseInt(b.price.replace(/\D/g, '')));
     else if (sortOrder === 'Price: High to Low') filteredRooms.sort((a, b) => parseInt(b.price.replace(/\D/g, '')) - parseInt(a.price.replace(/\D/g, '')));
 
@@ -90,6 +101,31 @@ export default function SearchClient({ initialRooms, initialQuery, initialCity }
                         <option value="Price: High to Low">Price: High to Low</option>
                     </select>
 
+                    <select
+                        className="ml-1 px-3.5 py-2 rounded-full text-xs font-semibold bg-white border border-slate-200 text-slate-600 outline-none cursor-pointer"
+                        value={propTypeFilter}
+                        onChange={e => setPropTypeFilter(e.target.value)}
+                        aria-label="Property Type Filter"
+                    >
+                        <option value="All">Type: All</option>
+                        <option value="PG">PG</option>
+                        <option value="Co-Living">Co-Living</option>
+                        <option value="Apartment">Apartment</option>
+                        <option value="Independent Room">Independent Room</option>
+                    </select>
+
+                    <select
+                        className="ml-1 px-3.5 py-2 rounded-full text-xs font-semibold bg-white border border-slate-200 text-slate-600 outline-none cursor-pointer"
+                        value={genderFilter}
+                        onChange={e => setGenderFilter(e.target.value)}
+                        aria-label="Gender Preference Filter"
+                    >
+                        <option value="Any">Gender: Any</option>
+                        <option value="Boys">Boys Only</option>
+                        <option value="Girls">Girls Only</option>
+                        <option value="Family">Family</option>
+                    </select>
+
                     <span className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
                         <i className="fas fa-shield-alt" aria-hidden="true" />
                         Premier Verified
@@ -116,6 +152,8 @@ export default function SearchClient({ initialRooms, initialQuery, initialCity }
                                 society={property.society} location={property.location} features={property.features}
                                 isWishlisted={wishlist.includes(property.id)}
                                 badge={idx === 0 ? 'GUEST FAVORITE' : undefined}
+                                genderPreference={property.genderPreference}
+                                propertyType={property.propertyType}
                                 onWishlistToggle={toggleWishlist}
                             />
                         ))}

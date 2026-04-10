@@ -12,12 +12,14 @@ export interface PropertyCardProps {
     features: { beds: string | number; baths: string | number; area: string };
     isWishlisted?: boolean;
     badge?: string;
+    genderPreference?: string;
+    propertyType?: string;
     onWishlistToggle?: (id: string) => void;
 }
 
 export default function PropertyCard({
     id, image, price, society, location, features,
-    isWishlisted = false, badge, onWishlistToggle,
+    isWishlisted = false, badge, genderPreference, propertyType, onWishlistToggle,
 }: PropertyCardProps) {
     const router = useRouter();
 
@@ -69,6 +71,23 @@ export default function PropertyCard({
                     <i className="fas fa-map-marker-alt text-rose-400" aria-hidden="true" />
                     {location}
                 </p>
+
+                {/* Metadata Pills */}
+                {(genderPreference || propertyType) && (
+                    <div className="flex gap-2 mb-3">
+                        {propertyType && (
+                            <span className="text-[9px] font-black uppercase tracking-wider bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md border border-slate-200 truncate max-w-[80px]">
+                                {propertyType}
+                            </span>
+                        )}
+                        {genderPreference && (
+                            <span className="text-[9px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-md border border-indigo-100 truncate max-w-[80px] shrink-0">
+                                {genderPreference} Only
+                            </span>
+                        )}
+                    </div>
+                )}
+
                 <div className="flex items-center gap-3 text-slate-500 text-xs border-t border-slate-50 pt-2.5">
                     <span className="flex items-center gap-1"><i className="fas fa-bed text-rose-300" aria-hidden="true" />{features.beds} Bed</span>
                     <span className="flex items-center gap-1"><i className="fas fa-bath text-rose-300" aria-hidden="true" />{features.baths} Bath</span>

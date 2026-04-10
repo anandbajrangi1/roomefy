@@ -12,6 +12,20 @@ async function getTenantSession() {
     return session;
 }
 
+export async function getTenantInquiries() {
+    const session = await getTenantSession();
+    
+    return prisma.inquiry.findMany({
+        where: {
+            userId: (session.user as any).id
+        },
+        include: {
+            property: true
+        },
+        orderBy: { createdAt: 'desc' }
+    });
+}
+
 export async function getTenantActiveLease() {
     const session = await getTenantSession();
     
@@ -98,6 +112,35 @@ export async function updateBookingDocuments(bookingId: string, data: { rentAgre
         data: {
             rentAgreementUrl: data.rentAgreementUrl || booking.rentAgreementUrl,
             policeVerificationUrl: data.policeVerificationUrl || booking.policeVerificationUrl
+        }
+    });
+}
+
+export async function serveNotice(bookingId: string) {
+    const session = await getTenantSession();
+    
+    // Safety check: Ensure the booking belongs to this tenant and is ACTIVE
+    const booking = await prisma.booking.findUnique({
+        where: { id: bookingId },
+        include: { room: { include: { property: true } } }
+    });
+
+    if (!booking || booking.tenantId !== (session.user as any).id) {
+        throw new Error("Unauthorized lease action");
+    }
+    
+    if (booking.status !== "ACTIVE") {
+        throw new Error("You can only serve notice on an active lease.");
+    }
+
+    // Process Date calculation using the notice period logic
+    const noticeDateRaw = new Date();
+    
+    return prisma.booking.update({
+        where: { id: bookingId },
+        data: {
+            status: 'SERVED_NOTICE',
+            noticeDate: noticeDateRaw
         }
     });
 }

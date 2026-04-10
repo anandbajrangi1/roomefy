@@ -49,6 +49,12 @@ model Property {
   description    String?
   whyChoose      String?
 
+  // PropTech Filtering Constraints
+  propertyType     String   @default("PG") // PG, Co-Living, Apartment, Independent Room
+  genderPreference String   @default("Any") // Boys, Girls, Any, Family
+  houseRules       String   @default("[]") // JSON Array
+  noticePeriod     Int      @default(30) // Notice Period in Days
+
   owner          User     @relation(fields: [ownerId], references: [id])
   rooms    Room[]
   inquiries Inquiry[]

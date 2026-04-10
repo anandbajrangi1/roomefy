@@ -28,7 +28,9 @@ export default async function WishlistPage() {
             location: `${item.room.property.area}, ${item.room.property.city}`,
             beds: item.room.type.includes("1BHK") ? "1" : "Shared",
             baths: "1",
-            area: "180 sq.ft"
+            area: "180 sq.ft",
+            propertyType: item.room.property.propertyType,
+            genderPreference: item.room.property.genderPreference
         };
     });
 

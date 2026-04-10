@@ -197,6 +197,18 @@ export default function TenantsView() {
                                                 <>
                                                     <div className="font-black text-slate-800 line-clamp-1">{activeBooking.room.property.title}</div>
                                                     <div className="text-[11px] text-slate-400 font-bold flex items-center gap-1 mt-1"><i className="fas fa-map-marker-alt text-rose-400"></i> {activeBooking.room.property.city}</div>
+                                                    
+                                                    {activeBooking.status === 'SERVED_NOTICE' && (
+                                                        <div className="mt-2 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5 flex items-start gap-1.5">
+                                                            <i className="fas fa-exclamation-triangle text-amber-500 text-[10px] mt-0.5"></i>
+                                                            <div>
+                                                                <div className="text-[9px] font-black text-amber-700 uppercase tracking-widest">Notice Served</div>
+                                                                <div className="text-[10px] font-bold text-amber-600">
+                                                                    Move-Out: {activeBooking.noticeDate ? new Date(new Date(activeBooking.noticeDate).getTime() + (activeBooking.room.property.noticePeriod || 30) * 24 * 60 * 60 * 1000).toLocaleDateString() : 'Pending'}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </>
                                             ) : (
                                                 <div className="text-[11px] font-bold text-slate-400 italic">No Active Booking</div>

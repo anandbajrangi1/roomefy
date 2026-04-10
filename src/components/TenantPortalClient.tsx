@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { getTenantActiveLease, submitMaintenanceRequest, getTenantComplaints, getTenantLedger, updateBookingDocuments } from '@/app/actions/tenant';
+import { getTenantActiveLease, submitMaintenanceRequest, getTenantComplaints, getTenantLedger, updateBookingDocuments, getTenantInquiries, serveNotice } from '@/app/actions/tenant';
 import { UploadButton } from '@/lib/uploadthing';
 
 export default function TenantPortalClient() {
     const [lease, setLease] = useState<any>(null);
     const [complaints, setComplaints] = useState<any[]>([]);
     const [payments, setPayments] = useState<any[]>([]);
+    const [inquiries, setInquiries] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('Overview');
     
@@ -22,14 +23,20 @@ export default function TenantPortalClient() {
 
     const loadAllData = async () => {
         try {
-            const [l, c, p] = await Promise.all([
+            const [l, c, p, i] = await Promise.all([
                 getTenantActiveLease(),
                 getTenantComplaints(),
-                getTenantLedger()
+                getTenantLedger(),
+                getTenantInquiries()
             ]);
             setLease(l);
             setComplaints(c);
             setPayments(p);
+            setInquiries(i);
+            
+            if (!l && activeTab === 'Overview') {
+                setActiveTab('Applications');
+            }
         } catch (err) {
             console.error("Failed to load portal data", err);
         } finally {
@@ -52,6 +59,17 @@ export default function TenantPortalClient() {
         }
     };
 
+    const handleServeNotice = async () => {
+        if (!confirm("Are you sure you want to serve notice to end your lease? This will notify your property manager.")) return;
+        try {
+            await serveNotice(lease.id);
+            alert("Notice served successfully. A property manager will contact you for move-out procedures.");
+            loadAllData();
+        } catch (err: any) {
+            alert(err.message || "Failed to serve notice.");
+        }
+    };
+
     if (loading) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
@@ -71,9 +89,13 @@ export default function TenantPortalClient() {
                 <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
                     <div>
                         <h1 className="text-3xl md:text-4xl font-black mb-2 tracking-tight">Your Living Experience</h1>
-                        <p className="text-slate-400 font-medium flex items-center gap-2">
-                            <i className="fas fa-key text-rose-500"></i>
-                            {lease ? `Active Lease at ${lease.room.property.title}` : "Currently on Waitlist / No Active Lease"}
+                        <p className={`font-medium flex items-center gap-2 ${lease && lease.status === 'SERVED_NOTICE' ? 'text-amber-400' : 'text-slate-400'}`}>
+                            <i className={lease && lease.status === 'SERVED_NOTICE' ? "fas fa-clock" : "fas fa-key text-rose-500"}></i>
+                            {lease 
+                                ? lease.status === 'SERVED_NOTICE' 
+                                    ? `Notice Served for ${lease.room.property.title}` 
+                                    : `Active Lease at ${lease.room.property.title}` 
+                                : "Currently on Waitlist / No Active Lease"}
                         </p>
                     </div>
                     {lease && (
@@ -96,7 +118,7 @@ export default function TenantPortalClient() {
 
             {/* Navigation Tabs */}
             <div className="flex bg-white p-1.5 rounded-2xl shadow-sm border border-slate-100 max-w-fit overflow-x-auto">
-                {['Overview', 'Maintenance', 'Payments'].map(tab => (
+                {['Overview', 'Applications', ...(lease ? ['Maintenance', 'Payments'] : [])].map(tab => (
                     <button
                         key={tab}
                         onClick={() => setActiveTab(tab)}
@@ -250,6 +272,30 @@ export default function TenantPortalClient() {
                                             <div className="text-[9px] font-bold text-slate-400 group-hover:text-white transition-colors">Submit Maintenance Issue</div>
                                         </div>
                                     </button>
+
+                                    {lease.status === 'ACTIVE' ? (
+                                        <button onClick={handleServeNotice} className="w-full flex items-center gap-4 p-4 rounded-2xl bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 hover:border-rose-300 transition-all group shadow-sm">
+                                            <div className="w-10 h-10 rounded-xl bg-rose-100 flex items-center justify-center group-hover:bg-rose-200 transition-colors">
+                                                <i className="fas fa-door-open text-rose-600"></i>
+                                            </div>
+                                            <div className="text-left">
+                                                <div className="text-xs font-black">Serve Notice</div>
+                                                <div className="text-[9px] font-bold text-rose-400 group-hover:text-rose-500 transition-colors">Request Move-Out</div>
+                                            </div>
+                                        </button>
+                                    ) : lease.status === 'SERVED_NOTICE' ? (
+                                        <div className="w-full flex items-center gap-4 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-700 transition-all opacity-80 cursor-not-allowed">
+                                            <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
+                                                <i className="fas fa-calendar-check text-amber-600"></i>
+                                            </div>
+                                            <div className="text-left">
+                                                <div className="text-xs font-black">Notice Active</div>
+                                                <div className="text-[9px] font-bold text-amber-500">
+                                                    Served on: {lease.noticeDate ? new Date(lease.noticeDate).toLocaleDateString() : 'Pending'}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : null}
                                 </div>
                             </div>
 
@@ -260,6 +306,62 @@ export default function TenantPortalClient() {
                                 <p className="text-[11px] font-bold text-rose-100 mb-4 opacity-80">Our caretaking team is available around the clock for emergencies.</p>
                                 <div className="text-lg font-black tracking-widest">+91 91234 56789</div>
                             </div>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'Applications' && (
+                    <div className="space-y-6">
+                        <div className="mb-4">
+                            <h2 className="text-xl font-black text-slate-900">Your Applications</h2>
+                            <p className="text-xs font-bold text-slate-400">Track the status of your property inquiries.</p>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {inquiries.length > 0 ? inquiries.map(inq => (
+                                <div key={inq.id} className="bg-white rounded-[2rem] p-6 border border-slate-100 shadow-sm flex flex-col justify-between group hover:border-slate-200 transition-all">
+                                    <div className="space-y-4">
+                                        <div className="flex justify-between items-start">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-rose-500">
+                                                    <i className="fas fa-home text-lg"></i>
+                                                </div>
+                                                <div>
+                                                    <h3 className="text-sm font-black text-slate-800 line-clamp-1">{inq.property.title}</h3>
+                                                    <p className="text-[10px] font-bold text-slate-400">{inq.property.city}, {inq.property.area}</p>
+                                                </div>
+                                            </div>
+                                            <span className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border ${
+                                                inq.status === 'NEW' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                                                inq.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                                'bg-amber-50 text-amber-600 border-amber-100'
+                                            }`}>{inq.status || 'NEW'}</span>
+                                        </div>
+                                        
+                                        {inq.message && (
+                                            <div className="bg-slate-50 rounded-xl p-3 text-[11px] font-medium text-slate-500 italic">
+                                                "{inq.message}"
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="mt-6 pt-4 border-t border-slate-50 flex items-center justify-between">
+                                        <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                            <i className="fas fa-calendar-alt"></i> Applied: {new Date(inq.createdAt).toLocaleDateString()}
+                                        </div>
+                                        {inq.status === 'APPROVED' && (
+                                            <span className="text-[10px] font-black text-emerald-600 animate-pulse uppercase tracking-widest">Awaiting Setup</span>
+                                        )}
+                                    </div>
+                                </div>
+                            )) : (
+                                <div className="col-span-full py-20 bg-white rounded-3xl border border-dashed border-slate-200 text-center">
+                                    <div className="w-16 h-16 bg-slate-50 flex items-center justify-center rounded-full mx-auto mb-4">
+                                        <i className="fas fa-file-signature text-2xl text-slate-300"></i>
+                                    </div>
+                                    <p className="text-sm font-bold text-slate-400">You haven't submitted any inquiries yet.</p>
+                                    <a href="/search" className="inline-block mt-4 text-xs font-black uppercase tracking-widest text-rose-600 hover:text-rose-700 transition-colors">Explore Properties &rarr;</a>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}

@@ -17,6 +17,14 @@ const AMENITIES_LIST = [
     { id: 'gaming', icon: 'fa-gamepad', label: 'Gaming Zone' }
 ];
 
+const HOUSE_RULES_LIST = [
+    { id: 'no-smoking', icon: 'fa-smoking-ban', label: 'No Smoking' },
+    { id: 'no-pets', icon: 'fa-ban', label: 'No Pets Allowed' },
+    { id: 'no-alcohol', icon: 'fa-wine-glass-alt', label: 'No Alcohol' },
+    { id: 'veg-only', icon: 'fa-carrot', label: 'Vegetarian Only' },
+    { id: 'curfew', icon: 'fa-clock', label: 'Curfew Applies' }
+];
+
 export default function NewListingView() {
     const [step, setStep] = useState(1);
     const [owners, setOwners] = useState<any[]>([]);
@@ -26,8 +34,10 @@ export default function NewListingView() {
     const [propertyData, setPropertyData] = useState({
         title: '', city: '', area: '', address: '', ownerId: '', 
         description: '', whyChoose: '',
+        propertyType: 'PG', genderPreference: 'Any', noticePeriod: '30',
         masterRent: '', masterDeposit: '', leaseStartDate: '', leaseEndDate: '',
         amenities: [] as string[],
+        houseRules: [] as string[],
         rooms: [{ type: 'Single Room', rent: '', deposit: '', amenities: [], images: [] as string[] }]
     });
 
@@ -41,6 +51,11 @@ export default function NewListingView() {
     const toggleAmenity = (id: string) => {
         const updated = propertyData.amenities.includes(id) ? propertyData.amenities.filter(a => a !== id) : [...propertyData.amenities, id];
         setPropertyData({ ...propertyData, amenities: updated });
+    };
+
+    const toggleHouseRule = (id: string) => {
+        const updated = propertyData.houseRules.includes(id) ? propertyData.houseRules.filter(r => r !== id) : [...propertyData.houseRules, id];
+        setPropertyData({ ...propertyData, houseRules: updated });
     };
 
     const addRoom = () => setPropertyData({ ...propertyData, rooms: [...propertyData.rooms, { type: 'Shared Room', rent: '', deposit: '', amenities: [], images: [] }] });
@@ -160,6 +175,24 @@ export default function NewListingView() {
                                 <label className={labelCls}>Full Address</label>
                                 <textarea name="address" value={propertyData.address} onChange={handlePropertyChange} rows={2} className={inputCls} placeholder="Complete building address..."></textarea>
                             </div>
+                            <div>
+                                <label className={labelCls}>Property Type</label>
+                                <select name="propertyType" value={propertyData.propertyType} onChange={handlePropertyChange} className={inputCls}>
+                                    <option value="PG">PG</option>
+                                    <option value="Co-Living">Co-Living</option>
+                                    <option value="Apartment">Apartment</option>
+                                    <option value="Independent Room">Independent Room</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className={labelCls}>Gender Preference</label>
+                                <select name="genderPreference" value={propertyData.genderPreference} onChange={handlePropertyChange} className={inputCls}>
+                                    <option value="Any">Any / Unisex</option>
+                                    <option value="Boys">Boys Only</option>
+                                    <option value="Girls">Girls Only</option>
+                                    <option value="Family">Family</option>
+                                </select>
+                            </div>
                             <div className="md:col-span-2">
                                 <label className={labelCls}>About Property (Description)</label>
                                 <textarea name="description" value={(propertyData as any).description} onChange={handlePropertyChange} rows={3} className={inputCls} placeholder="Describe the property, vibe, surroundings..."></textarea>
@@ -216,6 +249,26 @@ export default function NewListingView() {
                                     </div>
                                 );
                             })}
+                        </div>
+                        
+                        <div className="border-b border-slate-100 pb-5 mt-8">
+                            <h2 className="text-xl font-black text-slate-900">House Rules & Constraints</h2>
+                            <p className="text-sm font-bold text-slate-400 mt-1">Set expectations for tenants before they apply.</p>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                            {HOUSE_RULES_LIST.map(rule => {
+                                const selected = propertyData.houseRules.includes(rule.id);
+                                return (
+                                    <div key={rule.id} className={`flex flex-col items-center justify-center p-4 rounded-xl cursor-pointer transition-all border-2 text-center ${selected ? 'border-indigo-500 bg-indigo-50 text-indigo-600 shadow-[0_4px_12px_rgba(99,102,241,0.1)]' : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-600'}`} onClick={() => toggleHouseRule(rule.id)}>
+                                        <i className={`fas ${rule.icon} text-xl mb-2`}></i>
+                                        <span className="text-[10px] font-black uppercase tracking-wider">{rule.label}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <div className="mt-6 w-full max-w-sm">
+                            <label className={labelCls}>Notice Period (Days)</label>
+                            <input type="number" name="noticePeriod" value={propertyData.noticePeriod} onChange={handlePropertyChange} className={inputCls} placeholder="e.g. 30" />
                         </div>
                     </div>
                 )}

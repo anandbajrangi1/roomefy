@@ -91,6 +91,53 @@ export async function toggleInquirySharing(id: string, isSharedWithOwner: boolea
     });
 }
 
+export async function updateInquiryStatus(id: string, status: string) {
+    const ctx = await getAuthContext();
+    if (!ctx || ctx.role !== "ADMIN") throw new Error("Unauthorized");
+    return prisma.inquiry.update({
+        where: { id },
+        data: { status }
+    });
+}
+
+export async function convertLeadToTenant(inquiryId: string, data: any) {
+    const ctx = await getAuthContext();
+    if (!ctx || ctx.role !== "ADMIN") throw new Error("Unauthorized");
+
+    const inquiry = await prisma.inquiry.findUnique({ where: { id: inquiryId } });
+    if (!inquiry) throw new Error("Inquiry not found");
+
+    let tenantId = inquiry.userId;
+
+    // Auto-create tenant account if guest
+    if (!tenantId) {
+        const generatedEmail = `${inquiry.name?.replace(/\s+/g, '').toLowerCase() || 'user'}_${Date.now()}@guest.roomefy.com`;
+        const newUser = await prisma.user.create({
+            data: {
+                name: inquiry.name || 'Guest Lead',
+                phone: inquiry.phone,
+                email: generatedEmail,
+                password: await require('bcryptjs').hash('Roomefy@2026', 10),
+                role: 'TENANT',
+                memberNote: 'Auto-converted from lead funnel',
+                verificationStatus: 'PENDING'
+            }
+        });
+        tenantId = newUser.id;
+    }
+
+    // Connect to room if provided
+    if (data.roomId) {
+        await assignTenantToRoom(tenantId, data.roomId, data);
+    }
+    
+    // Update Inquiry
+    return prisma.inquiry.update({
+        where: { id: inquiryId },
+        data: { status: 'ONBOARDED', userId: tenantId }
+    });
+}
+
 export async function getAdminBookings() {
     const ctx = await getAuthContext();
     if (!ctx) throw new Error("Unauthorized");
@@ -152,7 +199,7 @@ export async function createProperty(data: any) {
     if (!ctx) throw new Error("Unauthorized");
     
     try {
-        const { title, city, area, address, ownerId, masterRent, masterDeposit, leaseStartDate, leaseEndDate, description, whyChoose, rooms } = data;
+        const { title, city, area, address, ownerId, masterRent, masterDeposit, leaseStartDate, leaseEndDate, description, whyChoose, rooms, propertyType, genderPreference, houseRules, noticePeriod } = data;
 
         // Owners can only create property for themselves
         const finalOwnerId = ctx.role === "ADMIN" ? ownerId : ctx.userId;
@@ -171,6 +218,10 @@ export async function createProperty(data: any) {
                     leaseEndDate,
                     description,
                     whyChoose,
+                    propertyType: propertyType || "PG",
+                    genderPreference: genderPreference || "Any",
+                    houseRules: houseRules ? JSON.stringify(houseRules) : "[]",
+                    noticePeriod: safeInt(noticePeriod) || 30,
                     status: 'APPROVED'
                 }
             });

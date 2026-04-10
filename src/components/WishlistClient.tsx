@@ -14,6 +14,8 @@ interface Property {
     beds: string;
     baths: string;
     area: string;
+    propertyType?: string;
+    genderPreference?: string;
 }
 
 export default function WishlistClient({ initialWishlist }: { initialWishlist: Property[] }) {
@@ -107,8 +109,25 @@ export default function WishlistClient({ initialWishlist }: { initialWishlist: P
                                             <i className="fas fa-star text-xs"></i> 4.9
                                         </div>
                                     </div>
-                                    <div className="text-[15px] text-gray-500 mt-0.5 line-clamp-1">{prop.location}</div>
-                                    <div className="text-[14px] text-gray-500 mt-0.5 flex gap-2">
+                                    <div className="text-[15px] text-gray-500 mt-0.5 line-clamp-1 mb-2">{prop.location}</div>
+                                    
+                                    {/* Metadata Pills */}
+                                    {(prop.genderPreference || prop.propertyType) && (
+                                        <div className="flex gap-2 mb-2">
+                                            {prop.propertyType && (
+                                                <span className="text-[9px] font-black uppercase tracking-wider bg-slate-200 text-slate-700 px-2 py-0.5 rounded-md truncate max-w-[80px]">
+                                                    {prop.propertyType}
+                                                </span>
+                                            )}
+                                            {prop.genderPreference && (
+                                                <span className="text-[9px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-md truncate max-w-[80px] shrink-0">
+                                                    {prop.genderPreference} Only
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    <div className="text-[14px] text-gray-500 flex gap-2">
                                         <span>{prop.beds} Bed</span> • <span>{prop.baths} Bath</span>
                                     </div>
                                     <div className="mt-2 text-[16px] text-gray-900 flex items-center justify-between">

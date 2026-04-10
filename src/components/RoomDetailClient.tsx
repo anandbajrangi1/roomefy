@@ -62,39 +62,39 @@ export default function RoomDetailClient({ room, property }: any) {
     const prevSlide = () => setCurrentSlide(p => (p > 0 ? p - 1 : images.length - 1));
     const nextSlide = () => setCurrentSlide(p => (p < images.length - 1 ? p + 1 : 0));
 
+    let houseRules: any[] = [];
+    try { 
+        houseRules = typeof property.houseRules === 'string' ? JSON.parse(property.houseRules) : property.houseRules; 
+    } catch { houseRules = []; }
+
+    const HOUSE_RULES_META: Record<string, any> = {
+        'no-smoking': { icon: 'fa-smoking-ban', label: 'No Smoking' },
+        'no-pets': { icon: 'fa-ban', label: 'No Pets Allowed' },
+        'no-alcohol': { icon: 'fa-wine-glass-alt', label: 'No Alcohol' },
+        'veg-only': { icon: 'fa-carrot', label: 'Vegetarian Only' },
+        'curfew': { icon: 'fa-clock', label: 'Curfew Applies' }
+    };
+
     return (
         <AppLayout hideBottomNav={true}>
-            <div className="max-w-[600px] mx-auto pb-28">
-
-                {/* Back nav */}
-                <div className="flex items-center justify-between px-4 py-3">
-                    <button className={iconBtn} aria-label="Go back" onClick={() => router.back()}>
-                        <i className="fas fa-arrow-left text-sm" aria-hidden="true" />
+            <div className="pb-28 bg-white min-h-screen relative max-w-lg mx-auto shadow-2xl">
+                {/* Fixed Top Bar */}
+                <div className="fixed top-0 max-w-lg w-full z-50 px-4 py-3 flex items-center justify-between pointer-events-none">
+                    <button className={iconBtn + " pointer-events-auto"} aria-label="Go back" onClick={() => router.back()}>
+                        <i className="fas fa-arrow-left" aria-hidden="true" />
                     </button>
-                    <div className="flex gap-2">
-                        <button className={iconBtn} aria-label="Share" onClick={handleShare}>
-                            <i className="fas fa-share-alt text-sm" aria-hidden="true" />
-                        </button>
-                        <button
-                            className={iconBtn + (isWishlisted ? ' text-rose-600' : '')}
-                            aria-label={isWishlisted ? 'Remove from wishlist' : 'Save'}
-                            onClick={toggleWishlist}
-                        >
-                            <i className={`fa-heart ${isWishlisted ? 'fas text-rose-600' : 'far'} text-sm`} aria-hidden="true" />
-                        </button>
-                    </div>
+                    <button className={iconBtn + " pointer-events-auto " + (isWishlisted ? "text-rose-600" : "")} aria-label="Save to wishlist" onClick={toggleWishlist}>
+                        <i className={`${isWishlisted ? "fas" : "far"} fa-heart text-lg`} aria-hidden="true" />
+                    </button>
                 </div>
 
-                {/* Image Slider */}
-                <div className="relative overflow-hidden rounded-2xl mx-4 h-56">
-                    {/* Track */}
-                    <div
-                        className="flex h-full transition-transform duration-500 ease-in-out"
-                        style={{ transform: `translateX(-${currentSlide * 100}%)` }}
-                    >
-                        {images.map((img, idx) => (
-                            <div key={idx} className="flex-shrink-0 w-full h-full relative">
-                                <Image src={img} alt={`Room photo ${idx + 1}`} fill className="object-cover" sizes="100vw" priority={idx === 0} />
+                {/* Photo Gallery constraints */}
+                <div className="relative w-full aspect-[4/3] bg-slate-100 overflow-hidden">
+                    <div className="flex h-full transition-transform duration-300 ease-in-out" style={{ transform: `translateX(-${currentSlide * 100}%)` }}>
+                        {images.map((img: string, idx: number) => (
+                            <div key={idx} className="relative min-w-full h-full">
+                                <Image src={img} alt={`Room at ${property.title}`} fill className="object-cover" priority={idx === 0} sizes="(max-width: 768px) 100vw, 32rem" />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/20 pointer-events-none" />
                             </div>
                         ))}
                     </div>
@@ -120,21 +120,38 @@ export default function RoomDetailClient({ room, property }: any) {
                             />
                         ))}
                     </div>
-
-                    {/* Counter (screen reader) */}
-                    <span className="sr-only" aria-live="polite" aria-atomic="true">Photo {currentSlide + 1} of {images.length}</span>
                 </div>
 
                 {/* Property header */}
                 <div className="px-4 pt-5 pb-2">
                     <h1 className="text-xl font-black text-slate-900 leading-tight">{property.title}</h1>
-                    <p className="text-xs text-slate-500 mt-1 flex items-center flex-wrap gap-x-2 gap-y-0.5">
+                    <p className="text-xs text-slate-500 mt-1 flex items-center flex-wrap gap-x-2 gap-y-0.5 mb-2">
                         <span><i className="fas fa-map-marker-alt text-rose-400 mr-1" aria-hidden="true" />{property.area}, {property.city}</span>
                         <span>·</span>
                         <span><i className="fas fa-star text-yellow-400 mr-1" aria-hidden="true" />4.9 (12 reviews)</span>
                         <span>·</span>
-                        <span className="bg-emerald-50 text-emerald-700 font-semibold px-2 py-0.5 rounded-full text-[10px] border border-emerald-200">Verified Premium</span>
+                        <span className="bg-emerald-50 text-emerald-700 font-semibold px-2 py-0.5 rounded-full text-[10px] border border-emerald-200">Verified</span>
                     </p>
+                    
+                    {/* Constraints/Metadata Badges */}
+                    <div className="flex flex-wrap gap-2 mb-3">
+                        {property.propertyType && (
+                            <span className="bg-slate-100 text-slate-600 font-bold px-2 py-1 rounded-[6px] text-[9px] tracking-widest uppercase border border-slate-200">
+                                <i className="fas fa-building mr-1"></i> {property.propertyType}
+                            </span>
+                        )}
+                        {property.genderPreference && (
+                            <span className="bg-indigo-50 text-indigo-600 font-bold px-2 py-1 rounded-[6px] text-[9px] tracking-widest uppercase border border-indigo-100">
+                                <i className="fas fa-venus-mars mr-1"></i> {property.genderPreference}
+                            </span>
+                        )}
+                        {property.noticePeriod && (
+                            <span className="bg-orange-50 text-orange-600 font-bold px-2 py-1 rounded-[6px] text-[9px] tracking-widest uppercase border border-orange-100">
+                                <i className="fas fa-clock mr-1"></i> {property.noticePeriod} Days Notice
+                            </span>
+                        )}
+                    </div>
+
                     <p className="text-2xl font-black text-rose-600 mt-2">
                         ₹{room.rent.toLocaleString()}<span className="text-sm font-medium text-slate-400">/month</span>
                     </p>
@@ -183,6 +200,28 @@ export default function RoomDetailClient({ room, property }: any) {
                         ))}
                     </div>
                 </div>
+
+                {/* House Rules */}
+                {houseRules && houseRules.length > 0 && (
+                    <div className="px-4 py-4 border-t border-slate-50">
+                        <h2 className="text-base font-bold text-slate-900 mb-3 flex items-center gap-2">
+                            <span className="w-1 h-4 bg-indigo-600 rounded-full inline-block" /> House Rules
+                        </h2>
+                        <div className="grid grid-cols-2 gap-3">
+                            {houseRules.map(rule => {
+                                const meta = HOUSE_RULES_META[rule] || { icon: 'fa-info-circle', label: rule };
+                                return (
+                                    <div key={rule} className="flex items-center gap-3 px-3 py-2.5 bg-slate-50 rounded-xl border border-slate-100">
+                                        <div className="w-6 h-6 rounded-md bg-white flex items-center justify-center shadow-sm shrink-0">
+                                            <i className={`fas ${meta.icon} text-slate-400 text-xs`} />
+                                        </div>
+                                        <span className="text-[11px] font-bold text-slate-600 leading-tight">{meta.label}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
 
                 {/* Highlights */}
                 {property.whyChoose && (
