@@ -77,7 +77,7 @@ export async function getInquiries() {
 
     return prisma.inquiry.findMany({
         where,
-        include: { user: true, property: true },
+        include: { user: true, property: true, assignedTo: true },
         orderBy: { id: 'desc' }
     });
 }
@@ -97,6 +97,15 @@ export async function updateInquiryStatus(id: string, status: string) {
     return prisma.inquiry.update({
         where: { id },
         data: { status }
+    });
+}
+
+export async function assignInquiryToEmployee(id: string, employeeId: string | null) {
+    const ctx = await getAuthContext();
+    if (!ctx || ctx.role !== "ADMIN") throw new Error("Unauthorized");
+    return prisma.inquiry.update({
+        where: { id },
+        data: { assignedToId: employeeId }
     });
 }
 

@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { getInquiries, toggleInquirySharing, updateInquiryStatus, convertLeadToTenant } from '@/app/actions/admin';
+import { getInquiries, toggleInquirySharing, updateInquiryStatus, convertLeadToTenant, getEmployees, assignInquiryToEmployee } from '@/app/actions/admin';
 
 const PIPELINE_STAGES = [
-    { id: 'NEW', label: 'New Leads', color: 'blue' },
+    { id: 'NEW', label: 'New Lead', color: 'blue' },
     { id: 'CONTACTED', label: 'Contacted', color: 'amber' },
     { id: 'VISITED', label: 'Visited', color: 'purple' },
     { id: 'APPROVED', label: 'Approved & Ready', color: 'emerald' },
@@ -13,19 +13,21 @@ const PIPELINE_STAGES = [
 
 export default function InquiriesView() {
     const [inquiriesData, setInquiriesData] = useState<any[]>([]);
+    const [employees, setEmployees] = useState<any[]>([]);
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
     const [isConverting, setIsConverting] = useState<string | null>(null);
 
     const loadData = () => {
-        getInquiries()
-            .then(data => {
-                const mappedData = data.map(inq => {
+        Promise.all([getInquiries(), getEmployees()])
+            .then(([inqData, empData]) => {
+                const mappedData = inqData.map(inq => {
                     let s = inq.status?.toUpperCase() || 'NEW';
                     if (!PIPELINE_STAGES.find(p => p.id === s)) s = 'NEW';
                     return { ...inq, status: s };
                 });
                 setInquiriesData(mappedData);
+                setEmployees(empData);
             })
             .catch(console.error)
             .finally(() => setLoading(false));
@@ -40,17 +42,11 @@ export default function InquiriesView() {
         return !q
             || inq.user?.name?.toLowerCase().includes(q)
             || inq.name?.toLowerCase().includes(q)
-            || inq.property?.title?.toLowerCase().includes(q);
+            || inq.property?.title?.toLowerCase().includes(q)
+            || inq.assignedTo?.name?.toLowerCase().includes(q);
     });
 
-    const handleStatusMove = async (id: string, currentStatus: string, direction: 'forward' | 'backward') => {
-        const currentIndex = PIPELINE_STAGES.findIndex(s => s.id === currentStatus);
-        const nextIndex = direction === 'forward' ? currentIndex + 1 : currentIndex - 1;
-        
-        if (nextIndex < 0 || nextIndex >= PIPELINE_STAGES.length) return;
-        
-        const newStatus = PIPELINE_STAGES[nextIndex].id;
-        
+    const handleStatusChange = async (id: string, newStatus: string) => {
         try {
             // Optimistic update
             setInquiriesData(inquiriesData.map(inq => 
@@ -59,7 +55,23 @@ export default function InquiriesView() {
             await updateInquiryStatus(id, newStatus);
         } catch (err: any) {
             alert(err.message || "Failed to update pipeline stage");
-            // Revert on fail
+            loadData();
+        }
+    };
+
+    const handleAssignEmployee = async (id: string, employeeId: string) => {
+        try {
+            const empTarget = employeeId === 'UNASSIGNED' ? null : employeeId;
+            const empObject = employees.find(e => e.id === employeeId) || null;
+            
+            // Optimistic update
+            setInquiriesData(inquiriesData.map(inq => 
+                inq.id === id ? { ...inq, assignedToId: empTarget, assignedTo: empObject } : inq
+            ));
+            
+            await assignInquiryToEmployee(id, empTarget);
+        } catch (err: any) {
+            alert(err.message || "Failed to assign lead");
             loadData();
         }
     };
@@ -78,15 +90,6 @@ export default function InquiriesView() {
         }
     };
 
-    const handleToggleShare = async (id: string, isShared: boolean) => {
-        try {
-            await toggleInquirySharing(id, isShared);
-            setInquiriesData(inquiriesData.map(inq => inq.id === id ? { ...inq, isSharedWithOwner: isShared } : inq));
-        } catch (err) {
-            console.error(err);
-        }
-    };
-
     if (loading) {
         return <div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-rose-600"></div></div>;
     }
@@ -95,122 +98,132 @@ export default function InquiriesView() {
         <div className="space-y-6 pb-12">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
                 <div>
-                    <h2 className="text-xl font-black text-slate-900">Lead Pipeline</h2>
-                    <p className="text-xs font-bold text-slate-400 mt-1">Drag leads through the conversion funnel.</p>
+                    <h2 className="text-xl font-black text-slate-900">Lead CRM Database</h2>
+                    <p className="text-xs font-bold text-slate-400 mt-1">Manage pipeline status and assign leads to staff.</p>
                 </div>
                 <div className="w-full md:w-80 relative">
                     <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
                     <input
                         type="text"
                         className="w-full bg-slate-50 border border-slate-200 rounded-full pl-10 pr-4 py-2.5 text-sm font-semibold text-slate-800 placeholder:text-slate-400 outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-100 transition-all"
-                        placeholder="Search leads..."
+                        placeholder="Search leads by name, property, or agent..."
                         value={search}
                         onChange={e => setSearch(e.target.value)}
                     />
                 </div>
             </div>
 
-            {/* Kanban Board */}
-            <div className="flex gap-6 overflow-x-auto pb-4 items-start snap-x snap-mandatory">
-                {PIPELINE_STAGES.map((stage, stageIndex) => {
-                    const stageInquiries = filtered.filter(inq => inq.status === stage.id);
-                    
-                    return (
-                        <div key={stage.id} className="min-w-[320px] max-w-[320px] flex-shrink-0 snap-center">
-                            {/* Column Header */}
-                            <div className="flex items-center justify-between mb-4 px-2">
-                                <h3 className={`text-sm font-black uppercase tracking-widest text-${stage.color}-600`}>{stage.label}</h3>
-                                <span className="bg-white border border-slate-200 text-slate-500 text-xs font-black px-2.5 py-1 rounded-lg shadow-sm">
-                                    {stageInquiries.length}
-                                </span>
-                            </div>
-
-                            {/* Column Body */}
-                            <div className={`bg-slate-50/50 border border-slate-100 rounded-3xl p-3 min-h-[500px] flex flex-col gap-3 transition-colors`}>
-                                {stageInquiries.map((inq) => (
-                                    <div key={inq.id} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 hover:border-rose-200 transition-all group">
-                                        <div className="flex justify-between items-start mb-3">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 text-[10px]">
-                                                    <i className="fas fa-user"></i>
-                                                </div>
-                                                <div>
-                                                    <div className="text-xs font-black text-slate-800">{inq.user?.name || inq.name || 'Guest Lead'}</div>
-                                                    <div className="text-[9px] font-bold text-slate-400">{new Date(inq.createdAt).toLocaleDateString()}</div>
-                                                </div>
+            {/* List View Table */}
+            <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden overflow-x-auto">
+                <table className="w-full text-left border-collapse min-w-[1000px]">
+                    <thead>
+                        <tr className="bg-slate-50 border-b border-slate-100">
+                            <th className="p-4 pl-6 text-xs font-black text-slate-400 uppercase tracking-widest w-[25%]">Lead Profile</th>
+                            <th className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest w-[20%]">Target Property</th>
+                            <th className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest w-[20%]">Pipeline Stage</th>
+                            <th className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest w-[20%]">Assigned Agent</th>
+                            <th className="p-4 pr-6 text-xs font-black text-slate-400 uppercase tracking-widest w-[15%] text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-sm font-medium text-slate-600 cursor-default">
+                        {filtered.length > 0 ? filtered.map((inq) => {
+                            const stageColor = PIPELINE_STAGES.find(p => p.id === inq.status)?.color || 'slate';
+                            
+                            return (
+                                <tr key={inq.id} className="hover:bg-slate-50/80 transition-colors group">
+                                    <td className="p-4 pl-6 align-top">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 flex-shrink-0">
+                                                <i className="fas fa-user"></i>
                                             </div>
-                                            
-                                            <button 
-                                                onClick={() => handleToggleShare(inq.id, !inq.isSharedWithOwner)}
-                                                className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${inq.isSharedWithOwner ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-50 text-slate-400 hover:bg-slate-200'}`}
-                                                title={inq.isSharedWithOwner ? "Shared with Owner" : "Share with Owner"}
+                                            <div>
+                                                <div className="font-black text-slate-800">{inq.user?.name || inq.name || 'Guest Lead'}</div>
+                                                <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold mt-0.5">
+                                                    {inq.phone ? <><i className="fas fa-phone-alt text-slate-300"></i> {inq.phone}</> : 'No Phone Provided'}
+                                                    <span className="text-slate-300">|</span>
+                                                    {new Date(inq.createdAt).toLocaleDateString()}
+                                                </div>
+                                                {inq.message && (
+                                                    <div className="text-[10px] italic text-slate-400 mt-1 line-clamp-1">"{inq.message}"</div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </td>
+                                    
+                                    <td className="p-4 align-top">
+                                        <div className="font-black text-slate-700 line-clamp-1 flex items-center gap-2">
+                                            <i className="fas fa-building text-slate-300"></i>
+                                            {inq.property?.title || 'Unknown Property'}
+                                        </div>
+                                        <div className="text-[10px] font-bold text-slate-400 mt-1">Lead ID: {inq.id.slice(-5).toUpperCase()}</div>
+                                    </td>
+                                    
+                                    <td className="p-4 align-top">
+                                        <div className="relative">
+                                            <select 
+                                                value={inq.status}
+                                                onChange={(e) => handleStatusChange(inq.id, e.target.value)}
+                                                className={`appearance-none w-full bg-${stageColor}-50 border border-${stageColor}-200 text-${stageColor}-700 text-xs font-black uppercase tracking-widest rounded-xl px-3 py-2 pr-8 outline-none focus:ring-2 focus:ring-${stageColor}-200 transition-colors cursor-pointer`}
                                             >
-                                                <i className={`fas ${inq.isSharedWithOwner ? 'fa-check-double' : 'fa-share'}`}></i>
+                                                {PIPELINE_STAGES.map(stage => (
+                                                    <option key={stage.id} value={stage.id}>{stage.label}</option>
+                                                ))}
+                                            </select>
+                                            <i className={`fas fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-${stageColor}-400 pointer-events-none text-[10px]`}></i>
+                                        </div>
+                                    </td>
+                                    
+                                    <td className="p-4 align-top">
+                                        <div className="relative">
+                                            <select 
+                                                value={inq.assignedToId || 'UNASSIGNED'}
+                                                onChange={(e) => handleAssignEmployee(inq.id, e.target.value)}
+                                                className={`appearance-none w-full bg-white border border-slate-200 text-slate-700 text-xs font-black rounded-xl px-3 py-2 pr-8 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all cursor-pointer ${inq.assignedToId ? '' : 'text-slate-400 italic'}`}
+                                            >
+                                                <option value="UNASSIGNED">Unassigned</option>
+                                                {employees.map(emp => (
+                                                    <option key={emp.id} value={emp.id}>{emp.name} ({emp.role})</option>
+                                                ))}
+                                            </select>
+                                            <i className="fas fa-user-circle absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none"></i>
+                                        </div>
+                                    </td>
+                                    
+                                    <td className="p-4 pr-6 align-top text-right">
+                                        {inq.status === 'APPROVED' ? (
+                                            <button 
+                                                onClick={() => handleConvertLead(inq.id)}
+                                                disabled={isConverting === inq.id}
+                                                className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-md hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                {isConverting === inq.id ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-bolt text-emerald-200"></i>}
+                                                {isConverting === inq.id ? 'Working...' : 'Convert'}
                                             </button>
-                                        </div>
-
-                                        <div className="mb-4">
-                                            <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Target Property</div>
-                                            <div className="text-xs font-bold text-slate-700 bg-slate-50 px-3 py-2 rounded-xl truncate">
-                                                <i className="fas fa-building text-slate-400 mr-2"></i>
-                                                {inq.property?.title || 'Unknown Property'}
-                                            </div>
-                                        </div>
-                                        
-                                        {inq.message && (
-                                            <div className="mb-4 text-[11px] font-medium text-slate-500 italic bg-amber-50/30 p-3 rounded-xl border border-amber-100/50">
-                                                "{inq.message}"
-                                            </div>
+                                        ) : inq.status === 'ONBOARDED' ? (
+                                            <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-100 text-slate-500 text-[10px] font-black uppercase tracking-widest rounded-xl">
+                                                <i className="fas fa-check"></i> Closed
+                                            </span>
+                                        ) : (
+                                            <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest inline-block py-2">
+                                                Pending
+                                            </span>
                                         )}
-
-                                        {/* Action Pipeline Buttons */}
-                                        <div className="flex items-center justify-between pt-4 border-t border-slate-50">
-                                            <button 
-                                                onClick={() => handleStatusMove(inq.id, stage.id, 'backward')}
-                                                disabled={stageIndex === 0}
-                                                className="w-8 h-8 rounded-full bg-slate-50 text-slate-400 hover:bg-slate-200 hover:text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center justify-center"
-                                            >
-                                                <i className="fas fa-chevron-left text-[10px]"></i>
-                                            </button>
-
-                                            {stage.id === 'APPROVED' ? (
-                                                <button 
-                                                    onClick={() => handleConvertLead(inq.id)}
-                                                    disabled={isConverting === inq.id}
-                                                    className="flex-1 mx-2 bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest py-2 rounded-xl hover:bg-emerald-700 shadow-md shadow-emerald-200 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-                                                >
-                                                    {isConverting === inq.id ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-file-contract"></i>}
-                                                    {isConverting === inq.id ? 'Converting...' : 'Convert Lead'}
-                                                </button>
-                                            ) : (
-                                                <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">
-                                                    ID: {inq.id.slice(-5).toUpperCase()}
-                                                </span>
-                                            )}
-
-                                            <button 
-                                                onClick={() => handleStatusMove(inq.id, stage.id, 'forward')}
-                                                disabled={stageIndex === PIPELINE_STAGES.length - 1}
-                                                className="w-8 h-8 rounded-full bg-slate-50 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center justify-center"
-                                            >
-                                                <i className="fas fa-chevron-right text-[10px]"></i>
-                                            </button>
-                                        </div>
+                                    </td>
+                                </tr>
+                            );
+                        }) : (
+                            <tr>
+                                <td colSpan={5} className="p-12 text-center">
+                                    <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-300 text-2xl mx-auto mb-4 border border-dashed border-slate-200">
+                                        <i className="fas fa-inbox"></i>
                                     </div>
-                                ))}
-
-                                {stageInquiries.length === 0 && (
-                                    <div className="h-full flex flex-col items-center justify-center text-center p-6 opacity-50">
-                                        <div className="w-12 h-12 rounded-full border-2 border-dashed border-slate-300 flex items-center justify-center text-slate-300 mb-3">
-                                            <i className="fas fa-ghost"></i>
-                                        </div>
-                                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Empty Stage</div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    );
-                })}
+                                    <h3 className="text-base font-black text-slate-800">No Leads Found</h3>
+                                    <p className="text-xs font-bold text-slate-400 mt-1">Try adjusting your search criteria.</p>
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
             </div>
         </div>
     );

@@ -128,9 +128,11 @@ model Inquiry {
   roomId     String?
   name       String?
   phone      String?
-  status     String   @default("NEW") // NEW, VISITED, BOOKED
+  status     String   @default("NEW") // NEW, CONTACTED, VISITED, APPROVED, ONBOARDED
   isSharedWithOwner Boolean @default(false)
   message    String?
+  assignedToId String?
+  assignedTo   Employee? @relation(fields: [assignedToId], references: [id])
   createdAt  DateTime @default(now())
 }
 
@@ -186,6 +188,7 @@ model Employee {
   salary       Int?
   status       String   @default("ACTIVE") // ACTIVE, ON_LEAVE, INACTIVE
   joiningDate  String
+  inquiries    Inquiry[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
