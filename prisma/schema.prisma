@@ -128,12 +128,30 @@ model Inquiry {
   roomId     String?
   name       String?
   phone      String?
-  status     String   @default("NEW") // NEW, CONTACTED, VISITED, APPROVED, ONBOARDED
+  status     String   @default("NEW") // NEW, CONTACTED, VISITED, APPROVED, ONBOARDED, ARCHIVED
   isSharedWithOwner Boolean @default(false)
   message    String?
   assignedToId String?
   assignedTo   Employee? @relation(fields: [assignedToId], references: [id])
+
+  // CRM Lead Intelligence
+  source          String?   // WEBSITE, WHATSAPP, WALKIN, INSTAGRAM, REFERRAL
+  preferredMoveIn DateTime?
+  followUpDate    DateTime?
+
+  activities InquiryActivity[]
   createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt @default(now())
+}
+
+model InquiryActivity {
+  id          String   @id @default(cuid())
+  inquiryId   String
+  inquiry     Inquiry  @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  type        String   @default("NOTE") // NOTE, STATUS_CHANGE, CALL_LOGGED, VISIT_SCHEDULED, ASSIGNED, SYSTEM
+  content     String
+  createdById String?  // Employee id or "ADMIN"
+  createdAt   DateTime @default(now())
 }
 
 model Wishlist {

@@ -32,7 +32,7 @@ export async function submitInquiry(payload: InquiryPayload): Promise<{ success:
         const session = await getServerSession(authOptions);
         const userId = (session?.user as any)?.id ?? null;
 
-        await prisma.inquiry.create({
+        const inquiry = await prisma.inquiry.create({
             data: {
                 propertyId,
                 roomId: roomId ?? null,
@@ -42,6 +42,16 @@ export async function submitInquiry(payload: InquiryPayload): Promise<{ success:
                 userId: userId ?? null,
                 status: 'NEW',
             },
+        });
+
+        // Seed the activity timeline with the creation event
+        await prisma.inquiryActivity.create({
+            data: {
+                inquiryId: inquiry.id,
+                type: 'SYSTEM',
+                content: `Lead enquiry received${userId ? ' from registered user' : ' from guest'}${property.title ? ` for ${property.title}` : ''}.`,
+                createdById: 'SYSTEM'
+            }
         });
 
         return { success: true };

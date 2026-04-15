@@ -94,19 +94,52 @@ export async function toggleInquirySharing(id: string, isSharedWithOwner: boolea
 export async function updateInquiryStatus(id: string, status: string) {
     const ctx = await getAuthContext();
     if (!ctx || ctx.role !== "ADMIN") throw new Error("Unauthorized");
-    return prisma.inquiry.update({
+
+    const prev = await prisma.inquiry.findUnique({ where: { id }, select: { status: true } });
+
+    const updated = await prisma.inquiry.update({
         where: { id },
-        data: { status }
+        data: { status, updatedAt: new Date() }
     });
+
+    // Auto-log the stage change activity
+    if (prev && prev.status !== status) {
+        await prisma.inquiryActivity.create({
+            data: {
+                inquiryId: id,
+                type: 'STATUS_CHANGE',
+                content: `Stage moved: ${prev.status} → ${status}`,
+                createdById: 'ADMIN'
+            }
+        });
+    }
+
+    return updated;
 }
 
 export async function assignInquiryToEmployee(id: string, employeeId: string | null) {
     const ctx = await getAuthContext();
     if (!ctx || ctx.role !== "ADMIN") throw new Error("Unauthorized");
-    return prisma.inquiry.update({
+
+    const updated = await prisma.inquiry.update({
         where: { id },
-        data: { assignedToId: employeeId }
+        data: { assignedToId: employeeId, updatedAt: new Date() },
+        include: { assignedTo: true }
     });
+
+    // Auto-log the assignment event
+    await prisma.inquiryActivity.create({
+        data: {
+            inquiryId: id,
+            type: 'ASSIGNED',
+            content: updated.assignedTo
+                ? `Lead assigned to ${updated.assignedTo.name} (${updated.assignedTo.role})`
+                : 'Lead unassigned',
+            createdById: 'ADMIN'
+        }
+    });
+
+    return updated;
 }
 
 export async function convertLeadToTenant(inquiryId: string, data: any) {
@@ -139,7 +172,17 @@ export async function convertLeadToTenant(inquiryId: string, data: any) {
     if (data.roomId) {
         await assignTenantToRoom(tenantId, data.roomId, data);
     }
-    
+
+    // Log conversion to activity timeline
+    await prisma.inquiryActivity.create({
+        data: {
+            inquiryId: inquiryId,
+            type: 'SYSTEM',
+            content: `Lead successfully converted to Tenant account${data.roomId ? ' and assigned a room' : ''}. Tenant ID: ${tenantId?.slice(-6).toUpperCase()}.`,
+            createdById: 'ADMIN'
+        }
+    });
+
     // Update Inquiry
     return prisma.inquiry.update({
         where: { id: inquiryId },
@@ -854,3 +897,95 @@ export async function verifyTenantDocuments(tenantId: string, status: string, no
     return user;
 }
 
+// ─── CRM Lead Detail Drawer Actions ─────────────────────────────────────────
+
+export async function getInquiryById(id: string) {
+    const ctx = await getAuthContext();
+    if (!ctx || ctx.role !== "ADMIN") throw new Error("Unauthorized");
+    return prisma.inquiry.findUnique({
+        where: { id },
+        include: {
+            user: true,
+            property: { include: { rooms: true } },
+            assignedTo: true,
+            activities: { orderBy: { createdAt: 'desc' } }
+        }
+    });
+}
+
+export async function addInquiryActivity(inquiryId: string, type: string, content: string) {
+    const ctx = await getAuthContext();
+    if (!ctx || ctx.role !== "ADMIN") throw new Error("Unauthorized");
+    return prisma.inquiryActivity.create({
+        data: { inquiryId, type, content, createdById: 'ADMIN' }
+    });
+}
+
+export async function updateInquiryDetails(id: string, data: {
+    source?: string;
+    preferredMoveIn?: string | null;
+    followUpDate?: string | null;
+    assignedToId?: string | null;
+}) {
+    const ctx = await getAuthContext();
+    if (!ctx || ctx.role !== "ADMIN") throw new Error("Unauthorized");
+
+    const prev = await prisma.inquiry.findUnique({
+        where: { id },
+        select: { assignedToId: true }
+    });
+
+    const updated = await prisma.inquiry.update({
+        where: { id },
+        data: {
+            source: data.source,
+            preferredMoveIn: data.preferredMoveIn ? new Date(data.preferredMoveIn) : null,
+            followUpDate: data.followUpDate ? new Date(data.followUpDate) : null,
+            ...(data.assignedToId !== undefined ? { assignedToId: data.assignedToId } : {}),
+            updatedAt: new Date()
+        },
+        include: { assignedTo: true }
+    });
+
+    // Auto-log agent assignment change
+    if (data.assignedToId !== undefined && data.assignedToId !== prev?.assignedToId) {
+        const newAgent = updated.assignedTo;
+        await prisma.inquiryActivity.create({
+            data: {
+                inquiryId: id,
+                type: 'ASSIGNED',
+                content: newAgent
+                    ? `Lead assigned to ${newAgent.name} (${newAgent.role})`
+                    : 'Lead unassigned',
+                createdById: 'ADMIN'
+            }
+        });
+    }
+
+    if (data.followUpDate) {
+        await prisma.inquiryActivity.create({
+            data: {
+                inquiryId: id,
+                type: 'SYSTEM',
+                content: `Follow-up scheduled for ${new Date(data.followUpDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`,
+                createdById: 'ADMIN'
+            }
+        });
+    }
+
+    return updated;
+}
+
+export async function archiveLead(id: string) {
+    const ctx = await getAuthContext();
+    if (!ctx || ctx.role !== "ADMIN") throw new Error("Unauthorized");
+
+    await prisma.inquiryActivity.create({
+        data: { inquiryId: id, type: 'SYSTEM', content: 'Lead archived (marked as Dead Lead)', createdById: 'ADMIN' }
+    });
+
+    return prisma.inquiry.update({
+        where: { id },
+        data: { status: 'ARCHIVED', updatedAt: new Date() }
+    });
+}
