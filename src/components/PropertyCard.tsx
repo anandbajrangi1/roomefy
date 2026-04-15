@@ -91,7 +91,7 @@ export default function PropertyCard({
                 <div className="flex items-center gap-3 text-slate-500 text-xs border-t border-slate-50 pt-2.5">
                     <span className="flex items-center gap-1"><i className="fas fa-bed text-rose-300" aria-hidden="true" />{features.beds} Bed</span>
                     <span className="flex items-center gap-1"><i className="fas fa-bath text-rose-300" aria-hidden="true" />{features.baths} Bath</span>
-                    <span className="flex items-center gap-1"><i className="fas fa-vector-square text-rose-300" aria-hidden="true" />{features.area}</span>
+                    <span className="flex items-center gap-1"><i className="fas fa-couch text-rose-300" aria-hidden="true" />{features.area}</span>
                 </div>
             </div>
         </div>

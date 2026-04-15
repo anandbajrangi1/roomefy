@@ -1,29 +1,18 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function SearchBar({
     placeholder = 'Search location (e.g. Koramangala, Bangalore)',
-    debounceMs = 350,
-}: { placeholder?: string; debounceMs?: number }) {
+}: { placeholder?: string }) {
     const router = useRouter();
     const [query, setQuery] = useState('');
-    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const navigate = (q: string) => {
         const t = q.trim();
         router.push(t ? `/search?q=${encodeURIComponent(t)}` : '/search');
     };
-
-    useEffect(() => {
-        if (debounceRef.current) clearTimeout(debounceRef.current);
-        if (query.length >= 2) {
-            debounceRef.current = setTimeout(() => navigate(query), debounceMs);
-        }
-        return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [query]);
 
     return (
         <section className="px-4 py-4" aria-label="Property search">
@@ -56,7 +45,7 @@ export default function SearchBar({
                         aria-label="Search properties"
                         onClick={() => navigate(query)}
                     >
-                        <i className="fas fa-sliders-h text-sm" aria-hidden="true" />
+                        <i className="fas fa-arrow-right text-sm" aria-hidden="true" />
                     </button>
                 </div>
             </div>

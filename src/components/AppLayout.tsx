@@ -76,7 +76,6 @@ export default function AppLayout({ children, hideBottomNav = false }: { childre
                         { icon: 'fa-search',          label: 'Search Properties', href: '/search' },
                         { icon: 'fa-heart',           label: 'Wishlist',          href: '/wishlist' },
                         { icon: 'fa-user',            label: 'Profile',           href: session ? '/dashboard/tenant/profile' : '/login' },
-                        { icon: 'fa-cog',             label: 'Settings',          href: null },
                         { icon: 'fa-question-circle', label: 'Help Center',       href: '/help' },
                     ].map(item => (
                         <button
