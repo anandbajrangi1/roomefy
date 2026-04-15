@@ -3,6 +3,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { getInquiries, toggleInquirySharing, updateInquiryStatus, convertLeadToTenant, getEmployees, assignInquiryToEmployee } from '@/app/actions/admin';
 import LeadDrawer from '@/components/LeadDrawer';
+import ManualLeadModal from '@/components/ManualLeadModal';
+import CSVImportModal from '@/components/CSVImportModal';
 
 const PIPELINE_STAGES = [
     { id: 'NEW', label: 'New Lead', color: 'blue' },
@@ -70,6 +72,8 @@ export default function InquiriesView() {
     const [isConverting, setIsConverting] = useState<string | null>(null);
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [filterStage, setFilterStage] = useState<string>('ALL');
+    const [showAddLead, setShowAddLead] = useState(false);
+    const [showImport, setShowImport] = useState(false);
 
     const loadData = useCallback(() => {
         Promise.all([getInquiries(), getEmployees()])
@@ -145,6 +149,34 @@ export default function InquiriesView() {
         return acc;
     }, {} as Record<string, number>);
 
+    // ─── Export CSV ───────────────────────────────────────────────────────────
+    const exportCSV = () => {
+        const visibleRows = filtered;
+        const headers = ['ID', 'Name', 'Phone', 'Property', 'City', 'Source', 'Stage', 'Assigned Agent', 'Follow-up Date', 'Move-In Date', 'Message', 'Created At'];
+        const rows = visibleRows.map(inq => [
+            inq.id,
+            inq.user?.name || inq.name || '',
+            inq.phone || '',
+            inq.property?.title || '',
+            inq.property?.city || '',
+            inq.source || '',
+            inq.status || '',
+            inq.assignedTo?.name || '',
+            inq.followUpDate ? new Date(inq.followUpDate).toLocaleDateString('en-IN') : '',
+            inq.preferredMoveIn ? new Date(inq.preferredMoveIn).toLocaleDateString('en-IN') : '',
+            (inq.message || '').replace(/,/g, ';').replace(/\n/g, ' '),
+            new Date(inq.createdAt).toLocaleDateString('en-IN'),
+        ]);
+        const csv = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `roomefy_leads_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
     if (loading) {
         return <div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-rose-600"></div></div>;
     }
@@ -153,20 +185,49 @@ export default function InquiriesView() {
         <>
             <div className="space-y-6 pb-12">
                 {/* Header */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
-                    <div>
-                        <h2 className="text-xl font-black text-slate-900">Lead CRM Database</h2>
-                        <p className="text-xs font-bold text-slate-400 mt-1">Click any row to open the full lead detail panel.</p>
-                    </div>
-                    <div className="w-full md:w-80 relative">
-                        <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
-                        <input
-                            type="text"
-                            className="w-full bg-slate-50 border border-slate-200 rounded-full pl-10 pr-4 py-2.5 text-sm font-semibold text-slate-800 placeholder:text-slate-400 outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-100 transition-all"
-                            placeholder="Search leads by name, property, or agent..."
-                            value={search}
-                            onChange={e => setSearch(e.target.value)}
-                        />
+                <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div>
+                            <h2 className="text-xl font-black text-slate-900">Lead CRM Database</h2>
+                            <p className="text-xs font-bold text-slate-400 mt-1">
+                                {inquiriesData.length} total leads · Click any row to open the full detail panel.
+                            </p>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                            {/* Search */}
+                            <div className="relative">
+                                <i className="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                                <input
+                                    type="text"
+                                    className="bg-slate-50 border border-slate-200 rounded-full pl-9 pr-4 py-2 text-sm font-semibold text-slate-800 placeholder:text-slate-400 outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-100 transition-all w-52"
+                                    placeholder="Search leads..."
+                                    value={search}
+                                    onChange={e => setSearch(e.target.value)}
+                                />
+                            </div>
+                            {/* Export */}
+                            <button
+                                onClick={exportCSV}
+                                className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-black rounded-full transition-colors"
+                                title={`Export ${filtered.length} visible leads to CSV`}
+                            >
+                                <i className="fas fa-file-export"></i> Export CSV
+                            </button>
+                            {/* Import */}
+                            <button
+                                onClick={() => setShowImport(true)}
+                                className="flex items-center gap-2 px-4 py-2 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 text-xs font-black rounded-full transition-colors"
+                            >
+                                <i className="fas fa-file-import"></i> Import CSV
+                            </button>
+                            {/* Add Lead */}
+                            <button
+                                onClick={() => setShowAddLead(true)}
+                                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-full transition-colors shadow-md shadow-indigo-200"
+                            >
+                                <i className="fas fa-user-plus"></i> Add Lead
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -367,6 +428,20 @@ export default function InquiriesView() {
                 inquiryId={selectedId}
                 onClose={() => setSelectedId(null)}
                 onUpdate={loadData}
+            />
+
+            {/* Manual Lead Modal */}
+            <ManualLeadModal
+                isOpen={showAddLead}
+                onClose={() => setShowAddLead(false)}
+                onCreated={() => { setShowAddLead(false); loadData(); }}
+            />
+
+            {/* CSV Import Modal */}
+            <CSVImportModal
+                isOpen={showImport}
+                onClose={() => setShowImport(false)}
+                onImported={() => loadData()}
             />
         </>
     );

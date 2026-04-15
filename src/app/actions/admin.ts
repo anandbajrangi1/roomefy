@@ -989,3 +989,125 @@ export async function archiveLead(id: string) {
         data: { status: 'ARCHIVED', updatedAt: new Date() }
     });
 }
+
+// ─── Manual Lead Creation ─────────────────────────────────────────────────────
+
+export async function createManualInquiry(data: {
+    name: string;
+    phone: string;
+    propertyId: string;
+    message?: string;
+    source?: string;
+    preferredMoveIn?: string | null;
+    followUpDate?: string | null;
+    assignedToId?: string | null;
+}) {
+    const ctx = await getAuthContext();
+    if (!ctx || ctx.role !== "ADMIN") throw new Error("Unauthorized");
+
+    if (!data.name?.trim() || !data.phone?.trim()) throw new Error("Name and phone are required.");
+    const property = await prisma.property.findUnique({ where: { id: data.propertyId } });
+    if (!property) throw new Error("Property not found.");
+
+    const inquiry = await prisma.inquiry.create({
+        data: {
+            name: data.name.trim(),
+            phone: data.phone.trim(),
+            propertyId: data.propertyId,
+            message: data.message?.trim() || null,
+            source: data.source || null,
+            preferredMoveIn: data.preferredMoveIn ? new Date(data.preferredMoveIn) : null,
+            followUpDate: data.followUpDate ? new Date(data.followUpDate) : null,
+            assignedToId: data.assignedToId || null,
+            status: 'NEW',
+        },
+    });
+
+    await prisma.inquiryActivity.create({
+        data: {
+            inquiryId: inquiry.id,
+            type: 'SYSTEM',
+            content: `Lead manually added to CRM by admin. Source: ${data.source || 'Direct Entry'}.`,
+            createdById: 'ADMIN',
+        },
+    });
+
+    // Auto-log assignment if already set
+    if (data.assignedToId) {
+        const emp = await prisma.employee.findUnique({ where: { id: data.assignedToId } });
+        if (emp) {
+            await prisma.inquiryActivity.create({
+                data: {
+                    inquiryId: inquiry.id,
+                    type: 'ASSIGNED',
+                    content: `Lead assigned to ${emp.name} (${emp.role}) at creation.`,
+                    createdById: 'ADMIN',
+                },
+            });
+        }
+    }
+
+    return inquiry;
+}
+
+// ─── CSV Bulk Import ──────────────────────────────────────────────────────────
+
+export async function bulkCreateInquiries(rows: Array<{
+    name: string;
+    phone: string;
+    propertyId: string;
+    source?: string;
+    message?: string;
+    preferredMoveIn?: string;
+    followUpDate?: string;
+}>) {
+    const ctx = await getAuthContext();
+    if (!ctx || ctx.role !== "ADMIN") throw new Error("Unauthorized");
+
+    const results = { success: 0, failed: 0, errors: [] as string[] };
+
+    for (const row of rows) {
+        try {
+            if (!row.name?.trim() || !row.phone?.trim()) {
+                results.failed++;
+                results.errors.push(`"${row.name || '(blank)'}": Name and Phone are required.`);
+                continue;
+            }
+            const property = await prisma.property.findUnique({ where: { id: row.propertyId } });
+            if (!property) {
+                results.failed++;
+                results.errors.push(`"${row.name}": Property ID "${row.propertyId}" not found.`);
+                continue;
+            }
+
+            const inquiry = await prisma.inquiry.create({
+                data: {
+                    name: row.name.trim(),
+                    phone: row.phone.trim(),
+                    propertyId: row.propertyId,
+                    source: row.source?.toUpperCase() || 'WALKIN',
+                    message: row.message?.trim() || null,
+                    preferredMoveIn: row.preferredMoveIn ? new Date(row.preferredMoveIn) : null,
+                    followUpDate: row.followUpDate ? new Date(row.followUpDate) : null,
+                    status: 'NEW',
+                },
+            });
+
+            await prisma.inquiryActivity.create({
+                data: {
+                    inquiryId: inquiry.id,
+                    type: 'SYSTEM',
+                    content: 'Lead imported from CSV by admin.',
+                    createdById: 'ADMIN',
+                },
+            });
+
+            results.success++;
+        } catch (e: any) {
+            results.failed++;
+            results.errors.push(`"${row.name}": ${e.message}`);
+        }
+    }
+
+    return results;
+}
