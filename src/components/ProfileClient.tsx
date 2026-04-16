@@ -5,6 +5,8 @@ import { signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import AppLayout from './AppLayout';
 import ProfileEditor, { ProfileHeader } from './ProfileEditor';
+import { UploadButton } from '@/lib/uploadthing';
+import { updateUserKycDocument } from '@/app/actions/profile';
 
 type Tab = 'overview' | 'documents' | 'settings';
 
@@ -39,11 +41,9 @@ const MetricCard = ({ icon, value, label, color }: { icon: string; value: string
 
 export default function ProfileClient({
     user: initialUser,
-    bookings,
     initialInquiriesCount,
 }: {
     user: any;
-    bookings: any[];
     initialInquiriesCount?: number;
 }) {
     const router = useRouter();
@@ -151,28 +151,50 @@ export default function ProfileClient({
                         className={activeTab === 'documents' ? '' : 'hidden'}
                     >
                         <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">Identity & Verification Documents</p>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-                            {[
-                                { name: 'Aadhaar Card',     icon: 'fa-id-card',   hint: 'Government photo ID' },
-                                { name: 'PAN Card',         icon: 'fa-id-badge',  hint: 'Tax identification' },
-                                { name: 'Employment Proof', icon: 'fa-briefcase', hint: 'Salary slip / offer letter' },
-                            ].map(doc => (
-                                <div key={doc.name} className="bg-white rounded-2xl p-5 shadow-[0_4px_12px_rgba(0,0,0,0.04)] border border-slate-50 flex flex-col items-center text-center gap-3">
-                                    <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center">
-                                        <i className={`fas ${doc.icon} text-slate-400 text-lg`} aria-hidden="true" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-bold text-slate-800">{doc.name}</p>
-                                        <p className="text-[11px] text-slate-400 font-medium mt-0.5">{doc.hint}</p>
-                                    </div>
-                                    <span className="flex items-center gap-1.5 text-[11px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
-                                        <i className="fas fa-clock text-[10px]" aria-hidden="true" /> Pending Upload
-                                    </span>
-                                    <button className="w-full py-2 border-2 border-dashed border-slate-200 hover:border-rose-400 hover:bg-rose-50 text-slate-400 hover:text-rose-600 font-semibold text-xs rounded-xl transition-all">
-                                        <i className="fas fa-upload mr-1.5" aria-hidden="true" /> Upload
-                                    </button>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                            {/* Primary KYC Document (Aadhaar/PAN) */}
+                            <div className={`rounded-2xl p-5 border transition-all flex flex-col items-center text-center gap-3 ${user?.kycDocumentUrl ? 'bg-white shadow-[0_4px_12px_rgba(0,0,0,0.04)] border-slate-50' : 'bg-slate-50/50 border-dashed border-slate-200'}`}>
+                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${user?.kycDocumentUrl ? 'bg-emerald-50 text-emerald-500' : 'bg-slate-100 text-slate-400'}`}>
+                                    <i className={`fas fa-id-card text-lg`} aria-hidden="true" />
                                 </div>
-                            ))}
+                                <div>
+                                    <p className="text-sm font-bold text-slate-800">Primary Identity</p>
+                                    <p className="text-[11px] text-slate-400 font-medium mt-0.5">Aadhaar or PAN Card</p>
+                                </div>
+                                
+                                {user?.kycDocumentUrl ? (
+                                    <>
+                                        <span className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
+                                            <i className="fas fa-check-circle text-[10px]" aria-hidden="true" /> Verified Upload
+                                        </span>
+                                        <a href={user.kycDocumentUrl} target="_blank" rel="noopener noreferrer" className="w-full py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 font-semibold text-xs rounded-xl transition-all">
+                                            <i className="fas fa-external-link-alt mr-1.5" aria-hidden="true" /> View Document
+                                        </a>
+                                    </>
+                                ) : (
+                                    <>
+                                        <span className="flex items-center gap-1.5 text-[11px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
+                                            <i className="fas fa-clock text-[10px]" aria-hidden="true" /> Pending Upload
+                                        </span>
+                                        <div className="w-full">
+                                            <UploadButton
+                                                endpoint="leaseDocument"
+                                                onClientUploadComplete={async (res) => {
+                                                    const updated = await updateUserKycDocument(res[0].url);
+                                                    setUser(updated);
+                                                    alert("Document uploaded successfully!");
+                                                }}
+                                                onUploadError={(error: Error) => alert(`Upload failed: ${error.message}`)}
+                                                appearance={{
+                                                    button: "w-full py-2 bg-white border-2 border-dashed border-slate-200 hover:border-rose-400 hover:bg-rose-50 text-slate-500 hover:text-rose-600 font-semibold text-xs rounded-xl transition-all shadow-none after:bg-rose-500",
+                                                    allowedContent: "hidden"
+                                                }}
+                                                content={{ button: "Upload ID" }}
+                                            />
+                                        </div>
+                                    </>
+                                )}
+                            </div>
                         </div>
 
                         {/* Verification notice */}
@@ -206,11 +228,11 @@ export default function ProfileClient({
                             ].map(item => (
                                 <button
                                     key={item.label}
-                                    onClick={() => item.path && router.push(item.path)}
-                                    className="flex items-center gap-4 bg-white rounded-2xl p-4 shadow-[0_4px_12px_rgba(0,0,0,0.04)] border border-slate-50 hover:shadow-md hover:-translate-y-0.5 transition-all text-left w-full"
+                                    onClick={() => item.path ? router.push(item.path) : alert('This feature is currently under active development and will be available soon.')}
+                                    className="flex items-center gap-4 bg-white rounded-2xl p-4 shadow-[0_4px_12px_rgba(0,0,0,0.04)] border border-slate-50 hover:shadow-md hover:-translate-y-0.5 transition-all text-left w-full group"
                                 >
-                                    <div className="w-10 h-10 flex-shrink-0 rounded-xl bg-slate-50 flex items-center justify-center">
-                                        <i className={`fas ${item.icon} text-slate-400`} aria-hidden="true" />
+                                    <div className="w-10 h-10 flex-shrink-0 rounded-xl bg-slate-50 flex items-center justify-center group-hover:bg-rose-50 transition-colors">
+                                        <i className={`fas ${item.icon} text-slate-400 group-hover:text-rose-500 transition-colors`} aria-hidden="true" />
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-sm font-bold text-slate-800">{item.label}</p>

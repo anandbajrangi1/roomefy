@@ -73,3 +73,19 @@ export async function getAccountSummary() {
         memberSince: user.createdAt,
     };
 }
+
+/**
+ * Updates the user's KYC document URL (Aadhaar, PAN, etc.)
+ */
+export async function updateUserKycDocument(kycDocumentUrl: string) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.email) throw new Error("Unauthorized");
+
+    const updatedUser = await prisma.user.update({
+        where: { email: session.user.email },
+        data: { kycDocumentUrl }
+    });
+
+    revalidatePath('/dashboard/tenant/profile');
+    return updatedUser;
+}

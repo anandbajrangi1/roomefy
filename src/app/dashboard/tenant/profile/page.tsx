@@ -14,23 +14,9 @@ export default async function ProfilePage() {
         where: { id: userId }
     });
 
-    const bookings = await prisma.booking.findMany({
-        where: { tenantId: userId },
-        include: { room: { include: { property: true } } }
-    });
-
     const inquiriesCount = await prisma.inquiry.count({
         where: { userId }
     });
 
-    const mappedBookings = bookings.map(b => {
-        let images = [];
-        try { images = JSON.parse(b.room.images); } catch(e) {}
-        return {
-            ...b,
-            room: { ...b.room, images }
-        };
-    });
-
-    return <ProfileClient user={user} bookings={mappedBookings} initialInquiriesCount={inquiriesCount} />;
+    return <ProfileClient user={user} initialInquiriesCount={inquiriesCount} />;
 }
