@@ -10,15 +10,15 @@ export default async function SearchPage({
   const q = typeof resolvedSearchParams.q === 'string' ? resolvedSearchParams.q : undefined;
   const city = typeof resolvedSearchParams.city === 'string' ? resolvedSearchParams.city : undefined;
 
-  // Build prisma query
-  let whereClause: any = { status: 'AVAILABLE', property: { status: 'APPROVED' } };
+  // Build prisma query — no room status filter so ALL rooms from APPROVED properties show
+  // OCCUPIED rooms will be badged as "Fully Booked", not hidden
+  let whereClause: any = { property: { status: 'APPROVED' } };
   
   if (q || city) {
       if (city) {
           whereClause.property.city = { contains: city };
       }
       if (q) {
-          // If query present, search in area or title or city
           whereClause.property.OR = [
               { city: { contains: q } },
               { area: { contains: q } },
@@ -29,7 +29,8 @@ export default async function SearchPage({
 
   const rooms = await prisma.room.findMany({
       where: whereClause,
-      include: { property: true }
+      include: { property: true },
+      orderBy: { status: 'asc' }, // AVAILABLE before OCCUPIED
   });
 
   const mappedRooms = rooms.map(room => {
@@ -52,7 +53,17 @@ export default async function SearchPage({
           location: `${room.property.area}, ${room.property.city}`,
           amenities: parsedAmenities,
           type: room.type,
-          features: { beds: room.type.includes('1BHK') ? 1 : 'Shared', baths: 1, area: "180 sq.ft" }
+          genderPreference: room.property.genderPreference,
+          propertyType: room.property.propertyType,
+          // Fixed: use real room fields instead of hardcoded values
+          features: {
+              beds: room.capacity > 1 ? `${room.capacity} Beds` : '1 Bed',
+              baths: room.bathroomType ?? 'Shared',
+              area: room.furnishing ?? 'Furnished',
+          },
+          // Show badge for occupied/unavailable rooms
+          badge: room.status === 'OCCUPIED' ? 'FULLY BOOKED'
+              : room.status === 'MAINTENANCE' ? 'MAINTENANCE' : undefined,
       };
   });
 

@@ -26,11 +26,13 @@ export const metadata: Metadata = {
 
 export default async function Home() {
     // ─── BUG FIX: Fetch more rooms so nearbyProperties isn't empty ──────────
+    // Show ALL rooms from APPROVED properties — OCCUPIED rooms are badged "FULLY BOOKED",
+    // not hidden. Prospective tenants can still see them and enquire.
     const rooms = await prisma.room.findMany({
-        where: { status: "AVAILABLE", property: { status: "APPROVED" } },
+        where: { property: { status: "APPROVED" } },
         include: { property: true },
-        take: 12,
-        orderBy: { id: "desc" },
+        take: 20,
+        orderBy: { status: "asc" }, // AVAILABLE rooms sort first
     });
 
     const allAmenities = new Set<string>();
@@ -69,7 +71,9 @@ export default async function Home() {
             furnishing: room.furnishing,
             genderPreference: room.property.genderPreference,
             propertyType: room.property.propertyType,
-            features: { beds: bedsLabel, baths: bathLabel, area: furnishLabel },
+            features: { beds: room.capacity > 1 ? `${room.capacity} Beds` : '1 Bed', baths: room.bathroomType ?? 'Shared', area: room.furnishing ?? 'Furnished' },
+            // OCCUPIED rooms get a badge, not hidden
+            badge: room.status === 'OCCUPIED' ? 'FULLY BOOKED' : room.status === 'MAINTENANCE' ? 'MAINTENANCE' : undefined,
         };
     });
 
