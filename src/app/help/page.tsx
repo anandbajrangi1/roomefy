@@ -3,38 +3,52 @@
 import { useState } from 'react';
 import AppLayout from '@/components/AppLayout';
 import { useRouter } from 'next/navigation';
+import { createSupportTicket } from '@/app/actions/support';
 
 export default function HelpCenterPage() {
     const router = useRouter();
     const [searchQuery, setSearchQuery] = useState("");
+    const [activeCategory, setActiveCategory] = useState<string | null>(null);
     const [activeFaq, setActiveFaq] = useState<number | null>(null);
+    const [showContactModal, setShowContactModal] = useState(false);
 
     const faqs = [
         {
+            category: "Bookings",
             question: "How do I schedule a property visit?",
             answer: "You can schedule a visit by navigating to a specific property's detail page and clicking 'Submit Enquiry'. The property owner or our admin team will contact you to arrange a suitable time."
         },
         {
+            category: "Payments",
             question: "Are security deposits refundable?",
             answer: "Yes, security deposits are fully refundable at the end of your tenure, provided there are no damages to the property and all outstanding dues are cleared. The refund is processed within 7 working days of move-out."
         },
         {
+            category: "Maintenance",
             question: "How do I submit a maintenance request?",
             answer: "If you are a registered tenant, log into your dashboard, go to 'Complaints & Requests', and click 'New Request'. Provide details and attach photos if necessary. Our maintenance team usually responds within 24 hours."
         },
         {
+            category: "Bookings",
             question: "Can I cancel a booking after paying the token amount?",
             answer: "Token amounts are generally non-refundable as they block the room from other potential tenants. However, under special circumstances verifiable by the admin, a partial refund may be issued."
         },
         {
+            category: "Bookings",
             question: "Is there a lock-in period for the rooms?",
             answer: "Most properties have a standard lock-in period of 3 to 6 months depending on the owner's terms. Please confirm the exact lock-in period on the room listing before proceeding with an agreement."
+        },
+        {
+            category: "Safety",
+            question: "What safety measures are in place?",
+            answer: "Our properties enforce standard safety protocols including KYC and Police Verification for all tenants, 24/7 helpline access, and secured access for common spaces."
         }
     ];
 
     const filteredFaqs = faqs.filter(f => 
-        f.question.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        f.answer.toLowerCase().includes(searchQuery.toLowerCase())
+        (activeCategory ? f.category === activeCategory : true) &&
+        (f.question.toLowerCase().includes(searchQuery.toLowerCase()) || 
+         f.answer.toLowerCase().includes(searchQuery.toLowerCase()))
     );
 
     return (
@@ -69,11 +83,14 @@ export default function HelpCenterPage() {
                             { icon: 'fa-tools', label: 'Maintenance' },
                             { icon: 'fa-shield-alt', label: 'Safety' },
                         ].map(c => (
-                            <div key={c.label} className="bg-white p-5 rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.04)] border border-slate-100 flex flex-col items-center justify-center text-center cursor-pointer hover:-translate-y-1 hover:border-rose-200 hover:shadow-rose-100 transition-all group">
-                                <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center mb-3 group-hover:bg-rose-50 transition-colors">
-                                    <i className={`fas ${c.icon} text-lg text-slate-400 group-hover:text-rose-500 transition-colors`}></i>
+                            <div 
+                                key={c.label} 
+                                onClick={() => setActiveCategory(activeCategory === c.label ? null : c.label)}
+                                className={`p-5 rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.04)] border flex flex-col items-center justify-center text-center cursor-pointer hover:-translate-y-1 transition-all group ${activeCategory === c.label ? 'bg-rose-600 border-rose-600 text-white shadow-rose-200' : 'bg-white border-slate-100 hover:border-rose-200 hover:shadow-rose-100 text-slate-700'}`}>
+                                <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 transition-colors ${activeCategory === c.label ? 'bg-white/20' : 'bg-slate-50 group-hover:bg-rose-50'}`}>
+                                    <i className={`fas ${c.icon} text-lg transition-colors ${activeCategory === c.label ? 'text-white' : 'text-slate-400 group-hover:text-rose-500'}`}></i>
                                 </div>
-                                <span className="text-[11px] font-black uppercase tracking-wider text-slate-700">{c.label}</span>
+                                <span className={`text-[11px] font-black uppercase tracking-wider ${activeCategory === c.label ? 'text-white' : ''}`}>{c.label}</span>
                             </div>
                         ))}
                     </div>
@@ -130,7 +147,7 @@ export default function HelpCenterPage() {
                             <p className="text-rose-100 font-medium text-sm max-w-sm">If you can't find the answer you're looking for, our support team is available 24/7 to assist you directly.</p>
                         </div>
                         <button 
-                            onClick={() => router.push('/dashboard/tenant/profile')} 
+                            onClick={() => setShowContactModal(true)} 
                             className="relative z-10 px-8 py-4 bg-white text-rose-600 hover:bg-slate-50 font-black text-sm uppercase tracking-widest rounded-xl transition-all shadow-md w-full md:w-auto focus:ring-4 focus:ring-white/20 outline-none"
                         >
                             Open a Ticket
@@ -138,6 +155,92 @@ export default function HelpCenterPage() {
                     </div>
                 </div>
             </div>
+
+            {/* Support Ticket Modal */}
+            {showContactModal && <ContactSupportModal onClose={() => setShowContactModal(false)} />}
         </AppLayout>
+    );
+}
+
+function ContactSupportModal({ onClose }: { onClose: () => void }) {
+    const [submitting, setSubmitting] = useState(false);
+    const [formData, setFormData] = useState({ name: '', email: '', category: 'General', subject: '', message: '' });
+
+    const handleSubmit = async (e: any) => {
+        e.preventDefault();
+        setSubmitting(true);
+        try {
+            await createSupportTicket(formData);
+            alert("Your ticket has been submitted successfully. Our team will contact you shortly.");
+            onClose();
+        } catch (err: any) {
+            alert(err.message || "Failed to submit ticket.");
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const inputCls = "w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 outline-none focus:border-rose-500 focus:bg-white transition-all font-medium";
+    const labelCls = "block text-[10px] font-black tracking-widest text-slate-400 uppercase mb-1.5";
+
+    return (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+            <div className="bg-white rounded-[2rem] w-full max-w-xl shadow-2xl animate-in fade-in zoom-in duration-200 overflow-hidden flex flex-col max-h-[90vh]">
+                <div className="p-6 md:p-8 border-b border-slate-100 bg-slate-50 flex items-center justify-between shrink-0">
+                    <div>
+                        <h2 className="text-xl font-black text-slate-900 tracking-tight">Contact Support</h2>
+                        <p className="text-[10px] font-bold text-rose-600 uppercase tracking-widest mt-1">We're here to help</p>
+                    </div>
+                    <button onClick={onClose} className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:shadow-sm transition-all focus:outline-none focus:ring-4 focus:ring-slate-100">
+                        <i className="fas fa-times text-sm"></i>
+                    </button>
+                </div>
+                
+                <div className="p-6 md:p-8 overflow-y-auto">
+                    <form id="ticket-form" onSubmit={handleSubmit} className="space-y-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                            <div>
+                                <label className={labelCls}>Your Name</label>
+                                <input required className={inputCls} placeholder="Jane Doe" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+                            </div>
+                            <div>
+                                <label className={labelCls}>Email Address</label>
+                                <input required type="email" className={inputCls} placeholder="jane@example.com" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                            <div>
+                                <label className={labelCls}>Issue Category</label>
+                                <select className={inputCls} value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>
+                                    <option>General</option>
+                                    <option>Bookings</option>
+                                    <option>Payments</option>
+                                    <option>Maintenance</option>
+                                    <option>Safety</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className={labelCls}>Subject</label>
+                                <input required className={inputCls} placeholder="Brief description" value={formData.subject} onChange={e => setFormData({...formData, subject: e.target.value})} />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className={labelCls}>How can we help?</label>
+                            <textarea required rows={4} className={`${inputCls} resize-y`} placeholder="Please provide as much detail as possible..." value={formData.message} onChange={e => setFormData({...formData, message: e.target.value})}></textarea>
+                        </div>
+                    </form>
+                </div>
+
+                <div className="p-6 md:p-8 bg-slate-50 border-t border-slate-100 flex gap-4 shrink-0">
+                    <button type="button" onClick={onClose} className="flex-1 py-4 border border-slate-200 bg-white text-slate-600 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-50 transition-all focus:outline-none focus:ring-4 focus:ring-slate-100">Cancel</button>
+                    <button type="submit" form="ticket-form" disabled={submitting} className="flex-[2] py-4 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-black transition-all shadow-lg shadow-slate-200 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-4 focus:ring-slate-900/20 flex items-center justify-center gap-2">
+                        {submitting ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-paper-plane mr-1"></i>}
+                        {submitting ? 'Submitting...' : 'Submit Ticket'}
+                    </button>
+                </div>
+            </div>
+        </div>
     );
 }

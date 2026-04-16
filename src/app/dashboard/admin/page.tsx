@@ -16,6 +16,7 @@ import EmployeesView from './EmployeesView';
 import ExpensesView from './ExpensesView';
 import DataView from './DataView';
 import AdminProfileView from './AdminProfileView';
+import SupportView from './SupportView';
 import NotificationCenter from '@/components/NotificationCenter';
 
 const menuItems = [
@@ -28,6 +29,7 @@ const menuItems = [
     { name: 'New Listing',         icon: 'fas fa-plus-circle' },
     { name: 'Procurements',        icon: 'fas fa-shopping-cart' },
     { name: 'Complaints',          icon: 'fas fa-exclamation-triangle' },
+    { name: 'Support',             icon: 'fas fa-headset' },
     { name: 'Employees',           icon: 'fas fa-users' },
     { name: 'Expenses',            icon: 'fas fa-file-invoice-dollar' },
 ];
@@ -73,6 +75,7 @@ export default function AdminDashboardPage() {
             case 'Profile':             return <AdminProfileView />;
             case 'New Listing':         return <NewListingView />;
             case 'Complaints':          return <ComplaintsView />;
+            case 'Support':             return <SupportView />;
             case 'Dashboard':           return null;
             default:
                 return (
